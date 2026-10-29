@@ -1,0 +1,386 @@
+/* ============================================================
+   Estructura general: barra superior, portada, chips de rubro,
+   barra de pedido y grilla de escritorio.
+   ============================================================ */
+
+.shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* --- Barra superior ------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding-inline: var(--s4);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.375rem;
+  letter-spacing: -0.055em;
+  font-variation-settings: 'opsz' 20;
+}
+.brand__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+  translate: 0 -1px;
+}
+
+.topbar__spacer { flex: 1; }
+
+.iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-full);
+  color: var(--ink);
+  transition: background var(--dur-1) var(--ease);
+}
+.iconbtn:hover { background: var(--surface-2); }
+.iconbtn[aria-pressed='true'] { background: var(--brand); color: var(--brand-ink); }
+
+/* --- Selector envío / retiro ---------------------------------- */
+.modeswitch {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--surface-sunk);
+  border-radius: var(--r-full);
+}
+.modeswitch__opt {
+  padding: 7px 14px;
+  border-radius: var(--r-full);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.modeswitch__opt[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+/* --- Franja del día ---------------------------------------------
+   Reemplaza a la portada grande: es lo que cambia todos los días y
+   además hace de único momento de color fuerte antes de la comida.
+   ------------------------------------------------------------- */
+.marquee {
+  scroll-snap-type: x mandatory;
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+.promo {
+  scroll-snap-align: center;
+  flex: 0 0 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s4);
+  text-align: left;
+  padding: var(--s4);
+  color: inherit;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.promo:active { opacity: 0.8; }
+.promo__kicker {
+  display: block;
+  /* Derivado del color de texto de la marca, no del acento: el acento no
+     contrasta contra el fondo de marca en todas las paletas (Carbón y
+     Vermut lo dejaban ilegible). */
+  color: color-mix(in srgb, var(--brand-ink) 82%, transparent);
+  margin-bottom: 4px;
+}
+.promo__title {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.3125rem;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-variation-settings: 'opsz' 24;
+}
+/* En el celular la franja se queda con el titular. La letra chica
+   aparece recién cuando hay ancho de sobra. */
+.promo__body { display: none; }
+.promo__go {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--brand-ink) 18%, transparent);
+}
+
+@media (min-width: 720px) {
+  .promo { flex-basis: min(560px, 60%); padding: var(--s5) var(--s6); }
+  .promo__title { font-size: 1.5rem; }
+  .promo__body {
+    display: block;
+    margin-top: 5px;
+    font-size: var(--t-sm);
+    opacity: 0.8;
+    max-width: 46ch;
+  }
+  .marquee { padding-inline: max(0px, calc((100% - var(--page-max)) / 2)); }
+}
+
+/* --- Línea de datos --------------------------------------------- */
+.statline {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  max-width: var(--page-max);
+  margin-inline: auto;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* El dato de más se desvanece en vez de cortarse al ras, así se lee
+     como "seguí deslizando" y no como un error de maquetado. */
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+}
+.statline::-webkit-scrollbar { display: none; }
+.statline > div, .statline__open { flex: 0 0 auto; white-space: nowrap; }
+.statline > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.statline dt {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.statline dd {
+  margin: 0;
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+.statline__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ok);
+}
+.statline__open i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.statline__open.is-cerrado { color: var(--ink-3); }
+
+/* El cartel de local cerrado. Va arriba de todo y antes de la carta,
+   para que nadie arme un pedido entero y recién ahí se entere. */
+.cerrado {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--s3) var(--s4);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  font-size: var(--t-sm);
+  color: var(--ink);
+}
+@media (min-width: 720px) { .cerrado { padding-inline: var(--s6); } }
+
+/* --- Chips de rubro -------------------------------------------- */
+.chips {
+  position: sticky;
+  top: var(--header-h);
+  z-index: var(--z-nav);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.chips__track {
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  max-width: var(--page-max);
+  margin-inline: auto;
+  width: 100%;
+}
+.chip {
+  flex: 0 0 auto;
+  padding: 8px 15px;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease),
+    border-color var(--dur-2) var(--ease);
+}
+.chip:hover { border-color: var(--line-strong); }
+.chip[aria-current='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+/* Los rieles superiores se alinean con la columna de la carta. */
+@media (min-width: 720px) {
+  .statline, .chips__track, .search { padding-inline: var(--s6); }
+}
+
+/* --- Buscador --------------------------------------------------- */
+.search {
+  padding: var(--s3) var(--s4) 0;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  width: 100%;
+}
+.search__row { position: relative; }
+.search__row .field__input { padding-left: 44px; }
+.search__icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+/* --- Área principal --------------------------------------------- */
+.main {
+  flex: 1;
+  padding-bottom: calc(var(--bar-h) + var(--s10) + var(--safe-b));
+}
+
+.section {
+  padding-top: var(--s8);
+  scroll-margin-top: calc(var(--header-h) + var(--chips-h) + 8px);
+}
+.section__head { margin-bottom: var(--s4); }
+.section__title {
+  font-size: var(--t-lg);
+  font-variation-settings: 'opsz' 28;
+}
+
+.empty {
+  padding: var(--s12) var(--s4);
+  text-align: center;
+  color: var(--ink-2);
+}
+.empty__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--t-lg);
+  color: var(--ink);
+  margin-bottom: var(--s2);
+}
+
+/* --- Barra inferior de pedido ------------------------------------ */
+.orderbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-bar);
+  padding: var(--s3) var(--s4) calc(var(--s3) + var(--safe-b));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  animation: bar-in var(--dur-3) var(--ease-out);
+}
+@keyframes bar-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.orderbar__inner {
+  max-width: 560px;
+  margin-inline: auto;
+  width: 100%;
+}
+.orderbar__btn {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 56px;
+  padding: 0 var(--s3);
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--brand-ink);
+  transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.orderbar__btn:active { transform: scale(0.985); }
+.orderbar__count {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding-inline: 8px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--brand-ink) 22%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+.orderbar__label {
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-md);
+  letter-spacing: -0.02em;
+}
+.orderbar__total {
+  padding-right: var(--s3);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-md);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Escritorio: carta + panel de pedido -------------------------- */
+.sidecart { display: none; }
+
+@media (min-width: 1040px) {
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 348px;
+    gap: var(--s8);
+    align-items: start;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    width: 100%;
+    padding-inline: var(--s6);
+  }
+  .layout > .main { padding-bottom: var(--s16); }
+  .sidecart {
+    display: block;
+    position: sticky;
+    top: calc(var(--header-h) + var(--s5));
+    margin-top: var(--s8);
+  }
+  .orderbar { display: none; }
+}

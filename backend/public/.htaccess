@@ -1,0 +1,14 @@
+# Todo lo que no sea un archivo real lo atiende index.php.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# El .env nunca se sirve, aunque alguien lo mueva de lugar por error.
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+Options -Indexes

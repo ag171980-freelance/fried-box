@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Foodix · cargar pedido de prueba</title>
+  </head>
+  <body>
+    <p>Cargando un pedido de prueba…</p>
+    <script>
+      // Fixture para trabajar el carrito y el checkout sin ir agregando
+      // platos a mano en cada recarga.
+      //   /seed.html            -> carga el pedido y va al carrito
+      //   /seed.html?to=/checkout
+      //
+      // No lleva precios: sólo qué se pidió. El total lo calcula el
+      // servidor, igual que cuando lo arma una persona.
+      const lines = [
+        {
+          key: 'f-burger-doble|apunto+panceta|sin pepinos, por favor',
+          itemId: 'f-burger-doble',
+          qty: 2,
+          optionIds: ['apunto', 'panceta'],
+          note: 'Sin pepinos, por favor',
+        },
+        { key: 'f-papas|individual|', itemId: 'f-papas', qty: 1, optionIds: ['individual'], note: '' },
+        { key: 'f-limonada||', itemId: 'f-limonada', qty: 1, optionIds: [], note: '' },
+      ]
+
+      // La clave del carrito lleva el slug de la marca, igual que en la app.
+      const to = new URLSearchParams(location.search).get('to') || '/pedido'
+      const marca = 'friedbox'
+
+      localStorage.setItem(
+        'foodix.cart.' + marca,
+        JSON.stringify({ lines, mode: 'delivery', couponCode: '' }),
+      )
+
+      location.replace(to)
+    </script>
+  </body>
+</html>

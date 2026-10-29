@@ -1,0 +1,242 @@
+/* ============================================================
+   Datos de entrega, medio de pago, pasarela simulada y estado
+   del pedido.
+   ============================================================ */
+
+.checkout {
+  max-width: 560px;
+  margin-inline: auto;
+  width: 100%;
+  padding: var(--s5) var(--s4) calc(var(--s16) + var(--safe-b));
+}
+.checkout__title { font-size: var(--t-xl); margin-bottom: var(--s5); }
+
+.block { margin-bottom: var(--s8); }
+.block__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--t-md);
+  letter-spacing: -0.025em;
+  margin-bottom: var(--s4);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--line);
+}
+.block__grid { display: grid; gap: var(--s4); }
+@media (min-width: 560px) {
+  .block__grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* --- Tarjetas de opción (entrega y pago) ------------------------- */
+.pickcard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.pickcard + .pickcard { margin-top: var(--s3); }
+.pickcard:hover { border-color: var(--line-strong); }
+.pickcard:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-wash);
+}
+.pickcard input { accent-color: var(--brand); width: 20px; height: 20px; margin-top: 2px; }
+.pickcard__text { flex: 1; }
+.pickcard__name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.pickcard__desc {
+  margin-top: 2px;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.pickcard__side {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* --- Resumen fijo abajo ------------------------------------------ */
+.paybar {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--s6);
+  padding: var(--s4) 0 calc(var(--s4) + var(--safe-b));
+  /* Fondo opaco de verdad. El degradado va arriba, en el ::before: si
+     se usa como fondo de la barra, el total queda sobre la parte
+     transparente y se lee encima del campo que quedó atrás. */
+  background: var(--bg);
+}
+.paybar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--s6);
+  background: linear-gradient(to top, var(--bg), transparent);
+  pointer-events: none;
+}
+.paybar__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+.paybar__label { color: var(--ink-2); font-size: var(--t-sm); }
+.paybar__total { font-size: var(--t-lg); }
+
+/* --- Pasarela simulada -------------------------------------------- */
+.gateway {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--s5);
+  background: var(--surface-sunk);
+}
+.gateway__card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-2);
+  padding: var(--s6);
+  text-align: center;
+}
+.gateway__flag {
+  display: inline-block;
+  margin-bottom: var(--s5);
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.gateway__amount {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.5rem;
+  letter-spacing: -0.04em;
+  font-variation-settings: 'opsz' 48;
+}
+.gateway__ref {
+  margin-top: var(--s2);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.gateway__note {
+  margin: var(--s5) 0;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  text-align: left;
+}
+.gateway__actions { display: grid; gap: var(--s3); }
+
+/* --- Estado del pedido -------------------------------------------- */
+.orderview {
+  max-width: 560px;
+  margin-inline: auto;
+  width: 100%;
+  padding: var(--s6) var(--s4) calc(var(--s16) + var(--safe-b));
+}
+.orderview__hero { text-align: center; margin-bottom: var(--s6); }
+.orderview__mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--s4);
+  border-radius: var(--r-full);
+  background: var(--ok);
+  color: #fff;
+  animation: pop var(--dur-3) var(--ease-out);
+}
+.orderview__mark--bad { background: var(--danger); }
+@keyframes pop {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.orderview__title { font-size: var(--t-xl); }
+.orderview__sub { margin-top: var(--s2); color: var(--ink-2); }
+
+.track {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: var(--s6) 0;
+  padding: var(--s5);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+}
+.trackstep {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: var(--s3);
+  padding-bottom: var(--s5);
+  position: relative;
+}
+.trackstep:last-child { padding-bottom: 0; }
+.trackstep::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 22px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--line);
+}
+.trackstep:last-child::before { display: none; }
+.trackstep__bead {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  border: 2px solid var(--line);
+}
+.trackstep[data-state='done'] .trackstep__bead {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.trackstep[data-state='now'] .trackstep__bead {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
+.trackstep[data-state='now'] .trackstep__name { font-weight: 600; }
+.trackstep__name { line-height: 1.3; }
+.trackstep__when {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+.trackstep[data-state='todo'] .trackstep__name { color: var(--ink-3); }
+
+/* Falta pagar no es un error ni un éxito: es una espera. */
+.orderview__mark--wait {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}

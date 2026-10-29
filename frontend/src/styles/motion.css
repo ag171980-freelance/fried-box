@@ -1,0 +1,175 @@
+/* ============================================================
+   Movimiento.
+   Una sola secuencia orquestada al abrir la carta y feedback
+   puntual cuando el usuario hace algo. Nada decorativo.
+   El bloque de prefers-reduced-motion de base.css desactiva
+   todo esto de una, así que acá no hace falta repetirlo.
+   ============================================================ */
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes drop-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* --- Secuencia de apertura de la carta -------------------------- */
+.enter-1 { animation: drop-in 420ms var(--ease-out) backwards; animation-delay: 40ms; }
+.enter-2 { animation: rise-in 460ms var(--ease-out) backwards; animation-delay: 110ms; }
+.enter-3 { animation: rise-in 460ms var(--ease-out) backwards; animation-delay: 170ms; }
+
+/* Las tarjetas entran escalonadas. El retardo se corta a los siete
+   primeros ítems: más allá, el usuario todavía no llegó scrolleando y
+   sólo estaríamos demorando la carta. */
+.dish {
+  animation: rise-in 440ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--i, 0), 7) * 45ms);
+}
+
+/* Las pantallas internas entran enteras, sin escalonar. */
+.page-enter { animation: rise-in 380ms var(--ease-out) backwards; }
+
+/* --- Foto del plato --------------------------------------------- */
+/* Mientras la foto baja, el hueco late en lugar de quedarse gris.
+   Se condiciona a que exista una <img> todavía sin cargar: un plato
+   dibujado por vector no tiene nada que esperar y no debe latir. */
+.dish__media:has(.art-img:not(.is-loaded)),
+.sheet__hero:has(.art-img:not(.is-loaded)) {
+  background-image: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--surface-sunk) 48%,
+    var(--surface-2) 66%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.art-img {
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease);
+}
+.art-img.is-loaded { opacity: 1; }
+
+/* --- Agregar al pedido ------------------------------------------- */
+.addbtn__icon {
+  display: grid;
+  place-items: center;
+}
+.addbtn--done {
+  background: var(--ok);
+  color: #fff;
+}
+.addbtn--done .addbtn__icon { animation: pop-in 320ms var(--ease-out); }
+
+/* El contador cambia de valor y se remonta, así que la animación
+   vuelve a correr sola en cada agregado. */
+.orderbar__count,
+.dish__incart {
+  animation: pop-in 300ms var(--ease-out);
+}
+
+/* --- Barra de pedido --------------------------------------------- */
+.orderbar__total { transition: opacity var(--dur-2) var(--ease); }
+.is-recalc .orderbar__total,
+.is-recalc .paybar__total { opacity: 0.45; }
+
+/* --- Hoja de detalle: salida ------------------------------------- */
+@keyframes sheet-down {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(8%); opacity: 0; }
+}
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+.sheet-backdrop.is-closing { animation: fade-out var(--dur-2) var(--ease) forwards; }
+.sheet-backdrop.is-closing .sheet { animation: sheet-down var(--dur-2) var(--ease) forwards; }
+
+@media (min-width: 720px) {
+  @keyframes sheet-down {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(0.97); opacity: 0; }
+  }
+}
+
+/* ============================================================
+   Loader
+   Un plato visto de frente con vapor subiendo y el aro girando.
+   Aparece con retardo: si la carta llega en 200 ms, casi no se ve.
+   ============================================================ */
+.loader {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s5);
+  padding: var(--s12) var(--s4);
+  min-height: 52dvh;
+  animation: fade-in var(--dur-3) var(--ease) backwards;
+  animation-delay: 140ms;
+}
+.loader--full { min-height: 78dvh; }
+
+.loader__art { width: 116px; height: 116px; }
+
+.loader__plate { fill: var(--surface); stroke: var(--ink-3); stroke-width: 2; opacity: 0.9; }
+.loader__inner { fill: var(--surface-2); }
+.loader__shadow { fill: var(--ink); opacity: 0.07; }
+
+.loader__arc {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  /* Perímetro para r=36 ≈ 226. El trazo cubre un quinto del aro. */
+  stroke-dasharray: 46 180;
+  transform-origin: 60px 74px;
+  animation: arc-spin 1.15s linear infinite;
+}
+@keyframes arc-spin {
+  to { transform: rotate(360deg); }
+}
+
+.loader__steam path {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: steam 2.3s var(--ease) infinite;
+}
+.loader__steam path:nth-child(2) { animation-delay: 0.38s; }
+.loader__steam path:nth-child(3) { animation-delay: 0.76s; }
+
+@keyframes steam {
+  0% { opacity: 0; transform: translateY(8px) scaleY(0.65); }
+  35% { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(-12px) scaleY(1.2); }
+}
+
+.loader__label {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.btn--done { background: var(--ok); color: #fff; }
+.btn--done .addbtn__icon { animation: pop-in 320ms var(--ease-out); }

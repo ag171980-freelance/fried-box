@@ -1,0 +1,6 @@
+# Sólo se protege el .env. El bloqueo por carpeta va dentro de cada una:
+# un "Require all denied" acá arriba se combinaría con el de public/ y
+# terminaría bloqueando también la API.
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>

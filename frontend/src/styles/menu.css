@@ -1,0 +1,500 @@
+/* ============================================================
+   Los estilos de carta.
+   Cada uno vive bajo .m-<estilo> y comparte las piezas chicas
+   (.addbtn, .qty, .dish__art) para que cambiar de estilo no
+   cambie el comportamiento.
+   ============================================================ */
+
+/* --- Piezas compartidas ---------------------------------------- */
+.dish { position: relative; }
+
+/* Capa que abre el detalle. Va por encima del contenido y por debajo
+   del botón de agregar, para no anidar un botón dentro de otro. */
+.dish__hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  cursor: pointer;
+}
+.dish__hit:focus-visible { outline-offset: -3px; }
+
+.dish__action { position: relative; z-index: 2; }
+
+.dish__kicker { color: var(--brand); margin-bottom: var(--s2); }
+
+.dish__art {
+  background: var(--surface-2);
+  object-fit: cover;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.addbtn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.addbtn:hover { background: var(--brand-hover); }
+.addbtn:active { transform: scale(0.88); }
+
+.qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: var(--shadow-1);
+}
+.qty__btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
+  color: inherit;
+}
+.qty__btn:hover { background: color-mix(in srgb, var(--brand-ink) 20%, transparent); }
+.qty__n {
+  min-width: 20px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.dish__badge {
+  position: absolute;
+  top: var(--s2);
+  left: var(--s2);
+  padding: 4px 9px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dish__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ============================================================
+   1 · LISTA
+   Filas con miniatura a la derecha. Densa, escaneable, aguanta
+   cartas de cincuenta platos sin cansar.
+   ============================================================ */
+.m-lista { display: flex; flex-direction: column; }
+
+.m-lista .dish {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: var(--s4);
+  align-items: start;
+  width: 100%;
+  text-align: left;
+  padding: var(--card-pad) 0;
+  border-bottom: 1px solid var(--line);
+  transition: opacity var(--dur-2) var(--ease);
+}
+.m-lista .dish:first-child { padding-top: 0; }
+.m-lista .dish:hover .dish__name { color: var(--brand); }
+
+.m-lista .dish__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-md);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  transition: color var(--dur-1) var(--ease);
+}
+.m-lista .dish__desc {
+  margin-top: 5px;
+  font-size: var(--t-sm);
+  line-height: 1.45;
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.m-lista .dish__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s3);
+}
+.m-lista .dish__price { font-size: var(--t-md); }
+.m-lista .dish__media {
+  position: relative;
+  width: 92px;
+  aspect-ratio: 1;
+}
+.m-lista .dish__art { width: 100%; height: 100%; }
+.m-lista .dish__action {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+}
+
+/* ============================================================
+   2 · GRILLA
+   Dos columnas, foto grande. El hambre entra antes que el dato.
+   ============================================================ */
+.m-grilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s4) var(--s3);
+}
+@media (min-width: 640px) { .m-grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .m-grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s5) var(--s4); } }
+
+.m-grilla .dish {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.m-grilla .dish:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+.m-grilla .dish__media { position: relative; aspect-ratio: 1; background: var(--surface-2); }
+.m-grilla .dish__art { width: 100%; height: 100%; }
+.m-grilla .dish__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding: var(--s3) var(--s3) var(--s4);
+}
+.m-grilla .dish__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-base);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+.m-grilla .dish__desc {
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.m-grilla .dish__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin-top: auto;
+  padding-top: var(--s3);
+}
+.m-grilla .dish__price { font-size: var(--t-md); }
+
+/* ============================================================
+   3 · VIDRIERA
+   Un plato por bloque, imagen grande y ficha editorial al lado.
+   ============================================================ */
+.m-vidriera { display: flex; flex-direction: column; gap: var(--s5); }
+
+.m-vidriera .dish {
+  position: relative;
+  display: grid;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur-2) var(--ease);
+}
+.m-vidriera .dish:hover { box-shadow: var(--shadow-2); }
+.m-vidriera .dish__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(160deg, var(--surface-2), var(--surface-sunk));
+}
+.m-vidriera .dish__art { width: 100%; height: 100%; }
+.m-vidriera .dish__body { padding: var(--s5); }
+.m-vidriera .dish__name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-variation-settings: 'opsz' 32;
+}
+.m-vidriera .dish__desc {
+  margin-top: var(--s3);
+  color: var(--ink-2);
+  max-width: 48ch;
+}
+.m-vidriera .dish__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.m-vidriera .dish__price { font-size: var(--t-lg); }
+.m-vidriera .dish__action .btn { min-height: 44px; }
+
+@media (min-width: 860px) {
+  .m-vidriera .dish { grid-template-columns: 300px minmax(0, 1fr); align-items: stretch; }
+  .m-vidriera .dish__media { aspect-ratio: auto; height: 100%; min-height: 240px; }
+  .m-vidriera .dish__body { padding: var(--s6); display: flex; flex-direction: column; }
+  .m-vidriera .dish__foot { margin-top: auto; }
+}
+
+/* ============================================================
+   4 · MOSAICO
+   Grilla despareja. El primer plato de cada rubro ocupa el ancho
+   completo con foto apaisada y el resto cae en dos columnas, así
+   la carta tiene jerarquía sin gastar el alto de Vidriera.
+   ============================================================ */
+.m-mosaico {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s4) var(--s3);
+}
+
+.m-mosaico .dish {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.m-mosaico .dish:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+.m-mosaico .dish__media { position: relative; aspect-ratio: 1; background: var(--surface-2); }
+.m-mosaico .dish__art { width: 100%; height: 100%; }
+.m-mosaico .dish__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding: var(--s3) var(--s3) var(--s4);
+}
+.m-mosaico .dish__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-base);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+.m-mosaico .dish__desc {
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.m-mosaico .dish__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin-top: auto;
+  padding-top: var(--s3);
+}
+.m-mosaico .dish__price { font-size: var(--t-md); }
+
+/* El destacado de cada rubro */
+.m-mosaico .dish:nth-child(6n + 1) { grid-column: 1 / -1; }
+.m-mosaico .dish:nth-child(6n + 1) .dish__media { aspect-ratio: 16 / 9; }
+.m-mosaico .dish:nth-child(6n + 1) .dish__body { padding: var(--s4) var(--s4) var(--s5); }
+.m-mosaico .dish:nth-child(6n + 1) .dish__name { font-size: 1.25rem; letter-spacing: -0.03em; }
+.m-mosaico .dish:nth-child(6n + 1) .dish__desc { -webkit-line-clamp: 3; }
+.m-mosaico .dish:nth-child(6n + 1) .dish__price { font-size: var(--t-lg); }
+
+@media (min-width: 720px) {
+  .m-mosaico { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s5) var(--s4); }
+  .m-mosaico .dish:nth-child(6n + 1) { grid-column: span 2; }
+  .m-mosaico .dish:nth-child(6n + 1) .dish__media { aspect-ratio: 3 / 2; }
+}
+
+/* ============================================================
+   5 · CINTA
+   Bandas anchas con la foto de fondo y el texto encima. Muy
+   visual, pero cada plato ocupa la mitad que en Vidriera.
+   ============================================================ */
+.m-cinta { display: flex; flex-direction: column; gap: var(--s3); }
+
+.m-cinta .dish {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 150px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--surface-sunk);
+}
+.m-cinta .dish__media { position: absolute; inset: 0; z-index: -1; }
+.m-cinta .dish__art { width: 100%; height: 100%; border-radius: 0; }
+
+/* Cortina para que el texto blanco se lea sobre cualquier foto. */
+.m-cinta .dish__media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(8, 6, 4, 0.86) 0%,
+    rgba(8, 6, 4, 0.66) 42%,
+    rgba(8, 6, 4, 0.12) 100%
+  );
+}
+.m-cinta .dish__body {
+  position: relative;
+  width: 100%;
+  padding: var(--s4);
+  color: #fff;
+}
+.m-cinta .dish__name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  max-width: 18ch;
+}
+.m-cinta .dish__desc {
+  margin-top: 5px;
+  font-size: var(--t-sm);
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 34ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.m-cinta .dish__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-top: var(--s3);
+}
+.m-cinta .dish__price { font-size: var(--t-md); color: #fff; }
+.m-cinta .dish__badge { background: #fff; color: #14100c; }
+.m-cinta .dish__incart { background: #fff; color: #14100c; }
+/* El botón no puede depender del color de la marca: acá el fondo es una foto. */
+.m-cinta .addbtn {
+  background: #fff;
+  color: #14100c;
+  width: 40px;
+  height: 40px;
+}
+.m-cinta .addbtn:hover { background: rgba(255, 255, 255, 0.86); }
+
+@media (min-width: 720px) {
+  .m-cinta .dish { min-height: 200px; }
+  .m-cinta .dish__body { padding: var(--s5); }
+  .m-cinta .dish__name { font-size: 1.625rem; }
+}
+
+/* ============================================================
+   6 · CARRUSEL
+   Cada rubro es una fila que se desliza. Muestra mucha carta con
+   poco scroll vertical.
+   ============================================================ */
+.m-carrusel {
+  gap: var(--s3);
+  padding-bottom: var(--s2);
+  margin-inline: calc(var(--s4) * -1);
+  padding-inline: var(--s4);
+}
+@media (min-width: 720px) {
+  .m-carrusel { margin-inline: calc(var(--s6) * -1); padding-inline: var(--s6); }
+}
+.m-carrusel .dish {
+  position: relative;
+  flex: 0 0 158px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: transform var(--dur-2) var(--ease);
+}
+.m-carrusel .dish:active { transform: scale(0.98); }
+.m-carrusel .dish__media { position: relative; aspect-ratio: 1; background: var(--surface-2); }
+.m-carrusel .dish__art { width: 100%; height: 100%; }
+.m-carrusel .dish__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding: var(--s3);
+}
+.m-carrusel .dish__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-sm);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.m-carrusel .dish__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: var(--s2);
+}
+.m-carrusel .dish__price { font-size: var(--t-base); }
+.m-carrusel .addbtn { width: 30px; height: 30px; }
+@media (min-width: 720px) { .m-carrusel .dish { flex-basis: 196px; } }
+
+/* Indicador de cantidad ya pedida, común a todos los estilos ------ */
+.dish__incart {
+  position: absolute;
+  top: var(--s2);
+  right: var(--s2);
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding-inline: 6px;
+  border-radius: var(--r-full);
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}

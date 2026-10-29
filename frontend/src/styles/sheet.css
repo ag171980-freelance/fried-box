@@ -1,0 +1,162 @@
+/* ============================================================
+   Hoja inferior (bottom sheet) para el detalle del plato.
+   En pantallas anchas se convierte en un diálogo centrado.
+   ============================================================ */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: color-mix(in srgb, #05070f 55%, transparent);
+  animation: fade-in var(--dur-2) var(--ease);
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 92dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--shadow-3);
+  animation: sheet-up var(--dur-3) var(--ease-out);
+  overflow: hidden;
+}
+@keyframes sheet-up {
+  from { transform: translateY(6%); opacity: 0.4; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.sheet__grab {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  translate: -50% 0;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  z-index: 2;
+}
+
+.sheet__close {
+  position: absolute;
+  top: var(--s3);
+  right: var(--s3);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+.sheet__scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sheet__hero {
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(165deg, var(--surface-2), var(--surface-sunk));
+}
+.sheet__hero svg, .sheet__hero img { width: 100%; height: 100%; object-fit: cover; }
+
+.sheet__body { padding: var(--s5) var(--s5) var(--s6); }
+
+.sheet__title {
+  font-size: 1.625rem;
+  line-height: 1.05;
+  font-variation-settings: 'opsz' 34;
+}
+.sheet__desc {
+  margin-top: var(--s3);
+  color: var(--ink-2);
+  max-width: var(--reading-max);
+}
+.sheet__price {
+  margin-top: var(--s4);
+  font-size: var(--t-lg);
+}
+
+
+.optgroup__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--line);
+}
+.optgroup__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-md);
+  letter-spacing: -0.02em;
+}
+.optgroup__rule { color: var(--ink-3); }
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.opt:last-child { border-bottom: 0; }
+.opt input { accent-color: var(--brand); width: 20px; height: 20px; flex: 0 0 auto; }
+.opt__name { flex: 1; }
+.opt__price {
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.opt:has(input:checked) .opt__name { font-weight: 600; }
+
+.sheet__note { margin-top: var(--s6); }
+
+.sheet__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5) calc(var(--s4) + var(--safe-b));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.sheet__foot .qty {
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+.sheet__foot .qty__btn:hover { background: var(--line); }
+.sheet__foot .btn { flex: 1; }
+
+@media (min-width: 720px) {
+  .sheet-backdrop { align-items: center; padding: var(--s5); }
+  .sheet { border-radius: var(--r-xl); max-height: 88dvh; }
+  .sheet__grab { display: none; }
+  @keyframes sheet-up {
+    from { transform: scale(0.97); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+}
+
+/* fieldset necesita su propio reset para no romper el ritmo vertical */
+.optgroup {
+  border: 0;
+  padding: 0;
+  margin: var(--s6) 0 0;
+  min-inline-size: 0;
+}

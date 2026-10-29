@@ -1,0 +1,343 @@
+/* ============================================================
+   Foodix — sistema de tokens
+   Un tema define color. La tipografía y el ritmo son constantes.
+   ============================================================ */
+
+:root {
+  /* Tipografía ------------------------------------------------ */
+  --font-display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  /* Escala tipográfica (mobile first, crece en desktop) -------- */
+  --t-xs: 0.6875rem;   /* 11 - etiquetas mono */
+  --t-sm: 0.8125rem;   /* 13 - metadatos */
+  --t-base: 0.9375rem; /* 15 - cuerpo */
+  --t-md: 1.0625rem;   /* 17 - nombre de plato */
+  --t-lg: 1.375rem;    /* 22 - título de sección */
+  --t-xl: 1.875rem;    /* 30 - título de pantalla */
+  --t-2xl: 2.75rem;    /* 44 - hero */
+  --t-3xl: 3.75rem;    /* 60 - hero desktop */
+
+  /* Ritmo espacial (base 4) ----------------------------------- */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px;
+  --s12: 48px; --s16: 64px; --s20: 80px;
+
+  /* Radios ---------------------------------------------------- */
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 999px;
+
+  /* Contenedor ------------------------------------------------ */
+  --page-max: 1180px;
+  --reading-max: 62ch;
+
+  /* Cronometría ----------------------------------------------- */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --dur-3: 420ms;
+
+  /* Capas ----------------------------------------------------- */
+  --z-nav: 20;
+  --z-bar: 40;
+  --z-sheet: 60;
+  --z-lab: 55;
+
+  /* Alturas fijas --------------------------------------------- */
+  --header-h: 56px;
+  --chips-h: 52px;
+  --bar-h: 68px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* ============================================================
+   TEMA · Sifón  (por defecto)
+   Cobalto de sifón de soda sobre papel de bodegón. El azul es la
+   interfaz; lo único cálido en pantalla es la comida.
+   ============================================================ */
+[data-theme='sifon'] {
+  color-scheme: light;
+  --bg: #ebe7dd;
+  --surface: #fdfbf7;
+  --surface-2: #f4f0e7;
+  --surface-sunk: #e3ded2;
+  --ink: #101a2e;
+  --ink-2: #5c667a;
+  --ink-3: #8b93a3;
+  --line: #ded7c8;
+  --line-strong: #c8c0ad;
+
+  --brand: #1f44ff;
+  --brand-hover: #1636d6;
+  --brand-ink: #ffffff;
+  --brand-wash: #e4e8ff;
+
+  --accent: #ffb020;
+  --accent-ink: #2a1c00;
+
+  --danger: #d8341c;
+  --ok: #0f8a52;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(16, 26, 46, 0.1);
+  --shadow-1: 0 1px 2px rgba(16, 26, 46, 0.06), 0 2px 8px rgba(16, 26, 46, 0.05);
+  --shadow-2: 0 8px 28px rgba(16, 26, 46, 0.12);
+  --shadow-3: 0 -8px 40px rgba(16, 26, 46, 0.16);
+}
+
+/* ============================================================
+   TEMA · Carbón  (nocturno)
+   ============================================================ */
+[data-theme='carbon'] {
+  color-scheme: dark;
+  --bg: #0b0e15;
+  --surface: #151a25;
+  --surface-2: #1d2331;
+  --surface-sunk: #0f131c;
+  --ink: #f0ece2;
+  --ink-2: #a0a8b8;
+  --ink-3: #6d7688;
+  --line: #262d3d;
+  --line-strong: #38415a;
+
+  --brand: #5c78ff;
+  --brand-hover: #7189ff;
+  --brand-ink: #06091a;
+  --brand-wash: #1b2445;
+
+  --accent: #ffb020;
+  --accent-ink: #261900;
+
+  --danger: #ff6a4d;
+  --ok: #35c98a;
+
+  --plate: #232a3a;
+  --plate-shadow: rgba(0, 0, 0, 0.5);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 -10px 44px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================================
+   TEMA · Menta  (fresco / saludable)
+   ============================================================ */
+[data-theme='menta'] {
+  color-scheme: light;
+  --bg: #e8f1ea;
+  --surface: #ffffff;
+  --surface-2: #f2f8f3;
+  --surface-sunk: #dce8df;
+  --ink: #0d3427;
+  --ink-2: #4a6a5c;
+  --ink-3: #7d968a;
+  --line: #cfe0d5;
+  --line-strong: #b2cbbb;
+
+  --brand: #0f7a56;
+  --brand-hover: #0b6146;
+  --brand-ink: #ffffff;
+  --brand-wash: #d8ede2;
+
+  --accent: #ff7a4d;
+  --accent-ink: #2b0c00;
+
+  --danger: #c53a22;
+  --ok: #0f7a56;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(13, 52, 39, 0.1);
+  --shadow-1: 0 1px 2px rgba(13, 52, 39, 0.06), 0 2px 8px rgba(13, 52, 39, 0.06);
+  --shadow-2: 0 8px 28px rgba(13, 52, 39, 0.13);
+  --shadow-3: 0 -8px 40px rgba(13, 52, 39, 0.16);
+}
+
+/* ============================================================
+   TEMA · Fuego  (delivery clásico, alto contraste)
+   ============================================================ */
+[data-theme='fuego'] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #fff8f6;
+  --surface-2: #ffeeea;
+  --surface-sunk: #f7f1ef;
+  --ink: #17110f;
+  --ink-2: #6b5c58;
+  --ink-3: #9c8a85;
+  --line: #f1ddd7;
+  --line-strong: #dcc0b8;
+
+  --brand: #ef3320;
+  --brand-hover: #cf2513;
+  --brand-ink: #ffffff;
+  --brand-wash: #ffe4df;
+
+  --accent: #17110f;
+  --accent-ink: #ffffff;
+
+  --danger: #ef3320;
+  --ok: #14804a;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(23, 17, 15, 0.1);
+  --shadow-1: 0 1px 2px rgba(23, 17, 15, 0.05), 0 2px 8px rgba(23, 17, 15, 0.05);
+  --shadow-2: 0 8px 28px rgba(23, 17, 15, 0.12);
+  --shadow-3: 0 -8px 40px rgba(23, 17, 15, 0.15);
+}
+
+/* ============================================================
+   TEMA · Tostado  (cafetería de especialidad)
+   Avena, café tostado y caramelo. El botón es del color del
+   grano y el acento, el del azúcar quemada.
+   ============================================================ */
+[data-theme='tostado'] {
+  color-scheme: light;
+  --bg: #f0e9de;
+  --surface: #fbf7f1;
+  --surface-2: #f1e8da;
+  --surface-sunk: #e5dbca;
+  --ink: #2a1b12;
+  --ink-2: #6b5748;
+  --ink-3: #9a8672;
+  --line: #ded0bc;
+  --line-strong: #c6b49b;
+
+  --brand: #3e2417;
+  --brand-hover: #2a1810;
+  --brand-ink: #fbf7f1;
+  --brand-wash: #ebdfcf;
+
+  --accent: #d98e3a;
+  --accent-ink: #241203;
+
+  --danger: #b03a2b;
+  --ok: #4f7a3c;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(42, 27, 18, 0.1);
+  --shadow-1: 0 1px 2px rgba(42, 27, 18, 0.06), 0 2px 8px rgba(42, 27, 18, 0.06);
+  --shadow-2: 0 8px 28px rgba(42, 27, 18, 0.14);
+  --shadow-3: 0 -8px 40px rgba(42, 27, 18, 0.18);
+}
+
+/* ============================================================
+   TEMA · Sal  (mediterráneo, pescados)
+   Pared encalada, azul egeo y limón.
+   ============================================================ */
+[data-theme='sal'] {
+  color-scheme: light;
+  --bg: #edf1f0;
+  --surface: #ffffff;
+  --surface-2: #e6edec;
+  --surface-sunk: #dae4e3;
+  --ink: #10333a;
+  --ink-2: #4c6b70;
+  --ink-3: #7e979b;
+  --line: #cfdcdb;
+  --line-strong: #b0c5c4;
+
+  --brand: #0e6e7a;
+  --brand-hover: #0a555f;
+  --brand-ink: #ffffff;
+  --brand-wash: #d6eaec;
+
+  --accent: #f2c230;
+  --accent-ink: #2a2100;
+
+  --danger: #c4442e;
+  --ok: #128060;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(16, 51, 58, 0.1);
+  --shadow-1: 0 1px 2px rgba(16, 51, 58, 0.06), 0 2px 8px rgba(16, 51, 58, 0.06);
+  --shadow-2: 0 8px 28px rgba(16, 51, 58, 0.13);
+  --shadow-3: 0 -8px 40px rgba(16, 51, 58, 0.16);
+}
+
+/* ============================================================
+   TEMA · Higo  (pastelería y brunch)
+   Ciruela y pistacho. El verde del acento evita que el rosa se
+   coma la pantalla.
+   ============================================================ */
+[data-theme='higo'] {
+  color-scheme: light;
+  --bg: #f4ebee;
+  --surface: #fffdfd;
+  --surface-2: #f0e3e8;
+  --surface-sunk: #e6d6dc;
+  --ink: #33172a;
+  --ink-2: #6e4e62;
+  --ink-3: #9b7b8f;
+  --line: #e2cfd7;
+  --line-strong: #cdb2be;
+
+  --brand: #7a2e56;
+  --brand-hover: #5f2243;
+  --brand-ink: #fff7fa;
+  --brand-wash: #f0dce6;
+
+  --accent: #8fa860;
+  --accent-ink: #1b2408;
+
+  --danger: #c0392b;
+  --ok: #4f7a3c;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(51, 23, 42, 0.1);
+  --shadow-1: 0 1px 2px rgba(51, 23, 42, 0.06), 0 2px 8px rgba(51, 23, 42, 0.06);
+  --shadow-2: 0 8px 28px rgba(51, 23, 42, 0.14);
+  --shadow-3: 0 -8px 40px rgba(51, 23, 42, 0.17);
+}
+
+/* ============================================================
+   TEMA · Vermut  (bar y bodegón de noche)
+   Oscuro pero cálido, al revés de Carbón: fondo oxblood, letra
+   hueso y naranja de aperitivo.
+   ============================================================ */
+[data-theme='vermut'] {
+  color-scheme: dark;
+  --bg: #1a0f12;
+  --surface: #241519;
+  --surface-2: #2f1c21;
+  --surface-sunk: #140a0d;
+  --ink: #f2e4d6;
+  --ink-2: #b79e92;
+  --ink-3: #8a7268;
+  --line: #3a2429;
+  --line-strong: #533338;
+
+  --brand: #d4552f;
+  --brand-hover: #e4693f;
+  --brand-ink: #1a0f12;
+  --brand-wash: #3a1d18;
+
+  --accent: #e9c46a;
+  --accent-ink: #251a00;
+
+  --danger: #ff7a5c;
+  --ok: #8cbf6a;
+
+  --plate: #332126;
+  --plate-shadow: rgba(0, 0, 0, 0.5);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 -10px 44px rgba(0, 0, 0, 0.62);
+}
+
+/* Padding de las tarjetas de menú -------------------------------- */
+:root { --card-pad: var(--s4); --card-gap: var(--s3); }
+
+@media (min-width: 900px) {
+  :root {
+    --t-base: 1rem;
+    --t-md: 1.125rem;
+    --t-lg: 1.625rem;
+    --t-xl: 2.375rem;
+    --t-2xl: var(--t-3xl);
+    --header-h: 72px;
+  }
+}

@@ -1,0 +1,315 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Foodix\Order;
+
+use Foodix\Support\Money;
+use PDO;
+
+/**
+ * El precio de un pedido se calcula acá y en ningún otro lado.
+ *
+ * El front manda qué platos y qué opciones, nunca cuánto salen. Todo lo
+ * que llega del cliente se vuelve a buscar en la base: el precio, si el
+ * plato sigue disponible y si esa opción pertenece de verdad a ese
+ * plato. Un carrito puede haber estado dos días en localStorage, o
+ * puede venir armado a mano.
+ */
+final class Pricing
+{
+    public function __construct(private readonly PDO $db)
+    {
+    }
+
+    /**
+     * @param list<array{key:string, itemId:string, qty:int, optionIds:list<string>, note:string}> $lines
+     * @param array<string,mixed> $settings
+     * @return array<string,mixed>
+     */
+    public function quote(
+        int $tenantId,
+        int $menuId,
+        array $lines,
+        string $mode,
+        ?string $couponCode,
+        array $settings,
+    ): array {
+        $slugs = array_values(array_unique(array_column($lines, 'itemId')));
+        $products = $slugs === [] ? [] : $this->products($tenantId, $menuId, $slugs);
+        $allowed = $products === [] ? [] : $this->allowedChoices($tenantId, $menuId, array_column($products, 'id'));
+
+        $issues = [];
+        $priced = [];
+        $subtotalCents = 0;
+
+        foreach ($lines as $line) {
+            $product = $products[$line['itemId']] ?? null;
+
+            if ($product === null) {
+                $issues[] = [
+                    'key' => $line['key'],
+                    'codigo' => 'plato_no_disponible',
+                    'mensaje' => 'Sacamos un plato de la carta y ya no lo podemos preparar.',
+                ];
+                $priced[] = [
+                    'key' => $line['key'],
+                    'itemId' => $line['itemId'],
+                    'name' => null,
+                    'qty' => $line['qty'],
+                    'unitPrice' => 0.0,
+                    'total' => 0.0,
+                    'optionsLabel' => '',
+                    'note' => $line['note'],
+                    'available' => false,
+                ];
+                continue;
+            }
+
+            $productId = (int) $product['id'];
+            $choices = $allowed[$productId] ?? [];
+
+            $picked = [];
+            $extraCents = 0;
+            foreach ($line['optionIds'] as $choiceSlug) {
+                if (!isset($choices[$choiceSlug])) {
+                    $issues[] = [
+                        'key' => $line['key'],
+                        'codigo' => 'opcion_invalida',
+                        'mensaje' => sprintf('«%s» ya no está disponible para %s.', $choiceSlug, $product['name']),
+                    ];
+                    continue;
+                }
+                $picked[$choiceSlug] = $choices[$choiceSlug];
+                $extraCents += Money::toCents($choices[$choiceSlug]['price_delta']);
+            }
+
+            foreach ($this->groupIssues($line['key'], $product, $choices, $picked) as $issue) {
+                $issues[] = $issue;
+            }
+
+            $unitCents = Money::toCents($product['price']) + $extraCents;
+            $totalCents = $unitCents * $line['qty'];
+            $subtotalCents += $totalCents;
+
+            $priced[] = [
+                'key' => $line['key'],
+                'itemId' => $product['slug'],
+                'productId' => $productId,
+                'name' => $product['name'],
+                'qty' => $line['qty'],
+                'basePrice' => Money::fromCents(Money::toCents($product['price'])),
+                'unitPrice' => Money::fromCents($unitCents),
+                'total' => Money::fromCents($totalCents),
+                'options' => array_values($picked),
+                'optionsLabel' => implode(' · ', array_column($picked, 'choice_name')),
+                'note' => $line['note'],
+                'available' => true,
+            ];
+        }
+
+        /* --- envío, cupón y total ------------------------------------ */
+        $shippingCents = $mode === 'delivery' ? Money::toCents($settings['delivery_fee']) : 0;
+        $minOrderCents = Money::toCents($settings['min_order']);
+
+        [$coupon, $couponError] = $this->coupon($tenantId, $couponCode, $subtotalCents);
+
+        $discountCents = 0;
+        if ($coupon !== null) {
+            $discountCents = match ($coupon['type']) {
+                'percent' => Money::percentOf($subtotalCents, (float) $coupon['value']),
+                'fixed' => min(Money::toCents($coupon['value']), $subtotalCents),
+                default => 0,
+            };
+            if ($coupon['type'] === 'shipping') {
+                $shippingCents = 0;
+            }
+        }
+
+        $totalCents = max(0, $subtotalCents - $discountCents + $shippingCents);
+        $belowMinimum = $mode === 'delivery' && $subtotalCents < $minOrderCents;
+
+        return [
+            'lines' => $priced,
+            'subtotal' => Money::fromCents($subtotalCents),
+            'discount' => Money::fromCents($discountCents),
+            'shipping' => Money::fromCents($shippingCents),
+            'total' => Money::fromCents($totalCents),
+            'currency' => $settings['currency'],
+            'coupon' => $coupon === null ? null : [
+                'code' => $coupon['code'],
+                'label' => $coupon['label'],
+                'type' => $coupon['type'],
+            ],
+            'couponId' => $coupon === null ? null : (int) $coupon['id'],
+            'couponError' => $couponError,
+            'belowMinimum' => $belowMinimum,
+            'minOrder' => Money::fromCents($minOrderCents),
+            'eta' => $mode === 'delivery'
+                ? sprintf('%d a %d min', (int) $settings['eta_delivery_min'], (int) $settings['eta_delivery_max'])
+                : sprintf('%d a %d min', (int) $settings['eta_pickup_min'], (int) $settings['eta_pickup_max']),
+            'issues' => $issues,
+            'valid' => $issues === [] && $priced !== [],
+            'cents' => [
+                'subtotal' => $subtotalCents,
+                'discount' => $discountCents,
+                'shipping' => $shippingCents,
+                'total' => $totalCents,
+            ],
+        ];
+    }
+
+    /**
+     * Grupos obligatorios sin elegir y grupos con más opciones de las
+     * permitidas. Se avisa pero no se rompe: el carrito viejo se corrige
+     * abriendo el plato de nuevo.
+     *
+     * @param array<string,mixed> $product
+     * @param array<string,array<string,mixed>> $choices
+     * @param array<string,array<string,mixed>> $picked
+     * @return list<array<string,string>>
+     */
+    private function groupIssues(string $key, array $product, array $choices, array $picked): array
+    {
+        $issues = [];
+        $porGrupo = [];
+
+        foreach ($choices as $choice) {
+            $porGrupo[$choice['group_slug']] ??= [
+                'name' => $choice['group_name'],
+                'type' => $choice['group_type'],
+                'required' => (bool) $choice['group_required'],
+                'max' => $choice['group_max'] === null ? null : (int) $choice['group_max'],
+                'elegidas' => 0,
+            ];
+        }
+
+        foreach ($picked as $choice) {
+            $porGrupo[$choice['group_slug']]['elegidas']++;
+        }
+
+        foreach ($porGrupo as $grupo) {
+            if ($grupo['required'] && $grupo['elegidas'] < 1) {
+                $issues[] = [
+                    'key' => $key,
+                    'codigo' => 'falta_elegir',
+                    'mensaje' => sprintf('Falta elegir %s en %s.', mb_strtolower($grupo['name']), $product['name']),
+                ];
+            }
+            if ($grupo['type'] === 'single' && $grupo['elegidas'] > 1) {
+                $issues[] = [
+                    'key' => $key,
+                    'codigo' => 'demasiadas_opciones',
+                    'mensaje' => sprintf('En %s se elige una sola opción.', mb_strtolower($grupo['name'])),
+                ];
+            }
+            if ($grupo['max'] !== null && $grupo['elegidas'] > $grupo['max']) {
+                $issues[] = [
+                    'key' => $key,
+                    'codigo' => 'demasiadas_opciones',
+                    'mensaje' => sprintf('En %s se eligen hasta %d.', mb_strtolower($grupo['name']), $grupo['max']),
+                ];
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @param list<string> $slugs
+     * @return array<string, array<string,mixed>>  indexado por slug
+     */
+    private function products(int $tenantId, int $menuId, array $slugs): array
+    {
+        $in = implode(',', array_fill(0, count($slugs), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT id, slug, name, price
+               FROM products
+              WHERE tenant_id = ? AND menu_id = ? AND is_available = 1
+                AND slug IN ($in)",
+        );
+        $stmt->execute([$tenantId, $menuId, ...$slugs]);
+
+        $out = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $out[(string) $row['slug']] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Las opciones que cada plato realmente admite. Sin esto, un cliente
+     * podría mandar el id de una opción gratis de otro plato.
+     *
+     * @param list<int|string> $productIds
+     * @return array<int, array<string, array<string,mixed>>>
+     */
+    private function allowedChoices(int $tenantId, int $menuId, array $productIds): array
+    {
+        $ids = array_map('intval', $productIds);
+        $in = implode(',', array_fill(0, count($ids), '?'));
+
+        $stmt = $this->db->prepare(
+            "SELECT pog.product_id,
+                    og.slug AS group_slug, og.name AS group_name, og.type AS group_type,
+                    og.is_required AS group_required, og.max_choices AS group_max,
+                    oc.id AS choice_id, oc.slug AS choice_slug, oc.name AS choice_name,
+                    oc.price_delta
+               FROM product_option_groups pog
+               JOIN option_groups og ON og.id = pog.option_group_id
+               JOIN option_choices oc ON oc.option_group_id = og.id
+              WHERE og.tenant_id = ? AND og.menu_id = ?
+                AND oc.is_available = 1
+                AND pog.product_id IN ($in)
+              ORDER BY pog.sort_order ASC, oc.sort_order ASC",
+        );
+        $stmt->execute([$tenantId, $menuId, ...$ids]);
+
+        $out = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $out[(int) $row['product_id']][(string) $row['choice_slug']] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{0: ?array<string,mixed>, 1: ?string}
+     */
+    private function coupon(int $tenantId, ?string $code, int $subtotalCents): array
+    {
+        $code = strtoupper(trim((string) $code));
+        if ($code === '') {
+            return [null, null];
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT id, code, type, value, label, min_order, max_uses, used_count
+               FROM coupons
+              WHERE tenant_id = :t AND code = :c AND is_active = 1
+                AND (starts_at IS NULL OR starts_at <= NOW())
+                AND (ends_at   IS NULL OR ends_at   >= NOW())
+              LIMIT 1',
+        );
+        $stmt->execute(['t' => $tenantId, 'c' => $code]);
+        $coupon = $stmt->fetch();
+
+        if ($coupon === false) {
+            return [null, 'Ese código no existe o ya venció.'];
+        }
+
+        if ($coupon['max_uses'] !== null && (int) $coupon['used_count'] >= (int) $coupon['max_uses']) {
+            return [null, 'Ese código ya se usó todas las veces que se podía.'];
+        }
+
+        if ($coupon['min_order'] !== null && $subtotalCents < Money::toCents($coupon['min_order'])) {
+            return [null, sprintf(
+                'Ese código sirve a partir de $ %s.',
+                number_format((float) $coupon['min_order'], 0, ',', '.'),
+            )];
+        }
+
+        return [$coupon, null];
+    }
+}

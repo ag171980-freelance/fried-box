@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Foodix · comparar estilos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #14161c;
+        --ink: #f2eee6;
+        --dim: #9aa1b0;
+        --line: #2a2f3b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px 0 40px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Instrument Sans', system-ui, sans-serif;
+      }
+      header { padding: 0 28px 24px; }
+      h1 {
+        margin: 0;
+        font-family: 'Bricolage Grotesque', sans-serif;
+        font-weight: 800;
+        font-size: 2rem;
+        letter-spacing: -0.04em;
+      }
+      p.lede { margin: 8px 0 0; color: var(--dim); max-width: 62ch; }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 20px 28px 0;
+      }
+      .controls button {
+        font: inherit;
+        font-size: 0.8125rem;
+        padding: 7px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--dim);
+        cursor: pointer;
+      }
+      .controls button[aria-pressed='true'] {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
+      .controls span.legend {
+        font-family: 'DM Mono', monospace;
+        font-size: 0.6875rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--dim);
+        align-self: center;
+        margin-right: 4px;
+      }
+
+      .rack {
+        display: flex;
+        gap: 24px;
+        padding: 28px;
+        overflow-x: auto;
+      }
+      figure { margin: 0; flex: 0 0 auto; }
+      figcaption { margin-bottom: 10px; }
+      .name {
+        font-family: 'Bricolage Grotesque', sans-serif;
+        font-weight: 700;
+        font-size: 1.0625rem;
+        letter-spacing: -0.02em;
+      }
+      .blurb {
+        margin-top: 2px;
+        font-size: 0.8125rem;
+        color: var(--dim);
+        max-width: 390px;
+      }
+      .phone {
+        width: 390px;
+        height: 780px;
+        border-radius: 26px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        background: #fff;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+      iframe { width: 100%; height: 100%; border: 0; display: block; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Seis cartas, una sola app</h1>
+      <p class="lede">
+        El mismo menú y el mismo carrito dibujados de seis maneras. Elegí una paleta arriba y
+        compará. La combinación fija de la marca vive en tenant_settings.
+      </p>
+    </header>
+
+    <div class="controls" id="paletas">
+      <span class="legend">Paleta</span>
+      <button data-theme="sifon" aria-pressed="false">Sifón</button>
+      <button data-theme="tostado" aria-pressed="false">Tostado</button>
+      <button data-theme="sal" aria-pressed="false">Sal</button>
+      <button data-theme="higo" aria-pressed="false">Higo</button>
+      <button data-theme="menta" aria-pressed="false">Menta</button>
+      <button data-theme="fuego" aria-pressed="true">Fuego</button>
+      <button data-theme="vermut" aria-pressed="false">Vermut</button>
+      <button data-theme="carbon" aria-pressed="false">Carbón</button>
+    </div>
+
+    <div class="rack" id="rack"></div>
+
+    <script>
+      const LAYOUTS = [
+        ['lista', 'Lista', 'Filas con miniatura. La más rápida de escanear.'],
+        ['grilla', 'Grilla', 'Dos columnas con foto grande. Entra por el hambre.'],
+        ['mosaico', 'Mosaico', 'Un destacado por rubro y el resto en dos columnas.'],
+        ['vidriera', 'Vidriera', 'Un plato por bloque, tratamiento editorial.'],
+        ['cinta', 'Cinta', 'Bandas con la foto de fondo y el texto encima.'],
+        ['carrusel', 'Carrusel', 'Cada rubro se desliza en horizontal.'],
+      ]
+
+      // La app sirve una sola marca desde la raíz.
+      
+      let theme = 'fuego'
+      const rack = document.getElementById('rack')
+
+      function render() {
+        rack.innerHTML = ''
+        for (const [id, name, blurb] of LAYOUTS) {
+          const fig = document.createElement('figure')
+          fig.innerHTML = `
+            <figcaption>
+              <div class="name">${name}</div>
+              <div class="blurb">${blurb}</div>
+            </figcaption>
+            <div class="phone">
+              <iframe src="/?estilo=${id}&paleta=${theme}" title="Estilo ${name}"></iframe>
+            </div>`
+          rack.appendChild(fig)
+        }
+      }
+
+      document.getElementById('paletas').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-theme]')
+        if (!button) return
+        theme = button.dataset.theme
+        for (const b of document.querySelectorAll('#paletas button')) {
+          b.setAttribute('aria-pressed', String(b === button))
+        }
+        render()
+      })
+
+      render()
+    </script>
+  </body>
+</html>

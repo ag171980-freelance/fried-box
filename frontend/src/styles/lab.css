@@ -1,0 +1,167 @@
+/* ============================================================
+   Modo diseño.
+   Estilos del panel para probar cartas y paletas en vivo.
+   No se importa desde index.css: el panel no está montado, porque
+   elegir paleta y estilo es del panel de administración del local.
+   Ver components/StyleLab.jsx.
+   ============================================================ */
+
+.lab-fab {
+  position: fixed;
+  left: var(--s3);
+  bottom: calc(var(--s3) + var(--safe-b));
+  z-index: var(--z-lab);
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-2);
+  opacity: 0.85;
+  transition: transform var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease);
+}
+.lab-fab:hover { transform: translateY(-2px); opacity: 1; }
+.lab-fab__name { display: none; }
+
+/* Con espacio de sobra el botón se identifica solo. */
+@media (min-width: 1040px) {
+  .lab-fab {
+    width: auto;
+    height: 42px;
+    grid-auto-flow: column;
+    gap: var(--s2);
+    padding: 0 var(--s4) 0 var(--s3);
+    bottom: var(--s5);
+    left: var(--s5);
+  }
+  .lab-fab__name { display: inline; }
+}
+
+.lab-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-lab);
+  background: color-mix(in srgb, #05070f 50%, transparent);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  animation: fade-in var(--dur-2) var(--ease);
+}
+
+.lab {
+  width: 100%;
+  max-width: 420px;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--shadow-3);
+  animation: sheet-up var(--dur-3) var(--ease-out);
+  overflow: hidden;
+}
+@media (min-width: 720px) {
+  .lab-backdrop { align-items: center; padding: var(--s5); }
+  .lab { border-radius: var(--r-xl); max-height: 86dvh; }
+}
+
+.lab__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s5) var(--s5) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.lab__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--t-lg);
+  letter-spacing: -0.03em;
+}
+.lab__hint {
+  margin-top: 4px;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+  max-width: 40ch;
+}
+.lab__scroll { overflow-y: auto; padding: var(--s5); }
+.lab__group + .lab__group { margin-top: var(--s6); }
+.lab__legend {
+  display: block;
+  margin-bottom: var(--s3);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.labopt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--s3) var(--s4);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.labopt + .labopt { margin-top: var(--s2); }
+.labopt:hover { border-color: var(--line-strong); }
+.labopt[aria-pressed='true'] { border-color: var(--brand); background: var(--brand-wash); }
+.labopt__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.labopt__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-base);
+  letter-spacing: -0.02em;
+}
+.labopt__for {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.labopt__blurb {
+  margin-top: 4px;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+
+.swatch {
+  display: inline-flex;
+  border-radius: var(--r-full);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  flex: 0 0 auto;
+}
+.swatch i { width: 16px; height: 16px; display: block; }
+
+.lab__foot {
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5) calc(var(--s5) + var(--safe-b));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.lab__foot .btn { flex: 1; }
+
+.labopt__right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  flex: 0 0 auto;
+}
