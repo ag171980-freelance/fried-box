@@ -174,7 +174,7 @@ final class MenuRepository
         }
 
         $stmt = $this->db->prepare(
-            'SELECT oc.option_group_id, oc.slug, oc.name, oc.price_delta, oc.is_default
+            'SELECT oc.option_group_id, oc.slug, oc.name, oc.price_delta, oc.is_default, oc.is_exclusive
                FROM option_choices oc
                JOIN option_groups og ON og.id = oc.option_group_id
               WHERE og.tenant_id = :t AND og.menu_id = :m AND oc.is_available = 1
@@ -225,7 +225,8 @@ final class MenuRepository
     public function promos(int $tenantId, int $menuId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT pr.slug, pr.kicker, pr.title, pr.body, p.slug AS product_slug
+            'SELECT pr.slug, pr.kicker, pr.title, pr.body, p.slug AS product_slug,
+                    pr.discount_percent, pr.days, pr.image_path
                FROM promos pr
           LEFT JOIN products p ON p.id = pr.product_id AND p.is_available = 1
               WHERE pr.tenant_id = :t

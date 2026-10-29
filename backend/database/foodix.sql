@@ -23,7 +23,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-CREATE DATABASE IF NOT EXISTS `foodix`
+CREATE DATABASE IF NOT EXISTS `l0100759_friedb`
   DEFAULT CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
@@ -228,6 +228,7 @@ CREATE TABLE `option_choices` (
   `name`            VARCHAR(120) NOT NULL,
   `price_delta`     DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `is_default`      TINYINT(1)   NOT NULL DEFAULT 0,
+  `is_exclusive`    TINYINT(1)   NOT NULL DEFAULT 0 COMMENT 'va sola: «Sin salsas» no se combina con otras',
   `is_available`    TINYINT(1)   NOT NULL DEFAULT 1,
   `sort_order`      INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),

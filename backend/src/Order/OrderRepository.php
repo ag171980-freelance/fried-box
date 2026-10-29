@@ -46,14 +46,14 @@ final class OrderRepository
                     customer_name, customer_phone, customer_email,
                     address, address_extra, note, change_for,
                     coupon_id, coupon_code,
-                    subtotal, discount, shipping, total, currency, eta_text)
+                    subtotal, discount, promo_discount, promo_label, shipping, total, currency, eta_text)
                  VALUES
                    (:tenant, :menu, :public, :number, :status, :mode,
                     :method, :pstatus,
                     :name, :phone, :email,
                     :address, :extra, :note, :change,
                     :coupon_id, :coupon_code,
-                    :subtotal, :discount, :shipping, :total, :currency, :eta)',
+                    :subtotal, :discount, :promo_discount, :promo_label, :shipping, :total, :currency, :eta)',
             );
 
             $stmt->execute([
@@ -78,6 +78,8 @@ final class OrderRepository
                 'coupon_code' => $quote['coupon']['code'] ?? null,
                 'subtotal' => Money::toDecimal($quote['cents']['subtotal']),
                 'discount' => Money::toDecimal($quote['cents']['discount']),
+                'promo_discount' => Money::toDecimal($quote['cents']['promoDiscount']),
+                'promo_label' => $quote['promoLabel'] === null ? null : mb_substr($quote['promoLabel'], 0, 200),
                 'shipping' => Money::toDecimal($quote['cents']['shipping']),
                 'total' => Money::toDecimal($quote['cents']['total']),
                 'currency' => $quote['currency'],
@@ -305,5 +307,178 @@ final class OrderRepository
         }
 
         return $this->find($tenantId, $publicId);
+    }
+
+    /**
+     * Los pedidos del panel, con sus líneas, sin el historial.
+     *
+     * $estados filtra por estado; $desde/$hasta son 'Y-m-d H:i:s' en la
+     * hora de la base. $buscar mira número, nombre y teléfono.
+     *
+     * @param list<string> $estados
+     * @return list<array<string,mixed>>
+     */
+    public function panel(
+        int $tenantId,
+        array $estados,
+        ?string $desde,
+        ?string $hasta,
+        ?string $buscar,
+        int $limite = 200,
+    ): array {
+        $where = ['tenant_id = ?'];
+        $args = [$tenantId];
+
+        if ($estados !== []) {
+            $where[] = 'status IN (' . implode(',', array_fill(0, count($estados), '?')) . ')';
+            array_push($args, ...$estados);
+        }
+        if ($desde !== null) {
+            $where[] = 'created_at >= ?';
+            $args[] = $desde;
+        }
+        if ($hasta !== null) {
+            $where[] = 'created_at < ?';
+            $args[] = $hasta;
+        }
+        if ($buscar !== null && $buscar !== '') {
+            $where[] = '(CAST(number AS CHAR) = ? OR customer_name LIKE ? OR customer_phone LIKE ?)';
+            $like = '%' . addcslashes($buscar, '%_\\') . '%';
+            array_push($args, ltrim($buscar, '#'), $like, $like);
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT * FROM orders WHERE ' . implode(' AND ', $where)
+            . ' ORDER BY created_at DESC, id DESC LIMIT ' . max(1, min(500, $limite)),
+        );
+        $stmt->execute($args);
+        $orders = $stmt->fetchAll();
+
+        if ($orders === []) {
+            return [];
+        }
+
+        // Las líneas y sus opciones se traen de una vez para todos, no
+        // pedido por pedido: con cien pedidos serían doscientas consultas.
+        $ids = array_map(static fn (array $o): int => (int) $o['id'], $orders);
+        $in = implode(',', array_fill(0, count($ids), '?'));
+
+        $stmt = $this->db->prepare(
+            "SELECT id, order_id, product_slug, name, unit_price, qty, line_total, note
+               FROM order_items WHERE order_id IN ($in) ORDER BY sort_order ASC, id ASC",
+        );
+        $stmt->execute($ids);
+        $itemsByOrder = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $itemsByOrder[(int) $row['order_id']][] = $row;
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT oio.order_item_id, oio.name, oio.price_delta
+               FROM order_item_options oio
+               JOIN order_items oi ON oi.id = oio.order_item_id
+              WHERE oi.order_id IN ($in)
+              ORDER BY oio.sort_order ASC, oio.id ASC",
+        );
+        $stmt->execute($ids);
+        $optionsByItem = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $optionsByItem[(int) $row['order_item_id']][] = $row;
+        }
+
+        foreach ($orders as &$order) {
+            $order['items'] = $itemsByOrder[(int) $order['id']] ?? [];
+            $order['optionsByItem'] = $optionsByItem;
+            $order['events'] = [];
+        }
+        unset($order);
+
+        return $orders;
+    }
+
+    /**
+     * Mueve el pedido de estado desde el panel y lo deja en el historial.
+     *
+     * Un pedido en efectivo que se entrega queda cobrado: el repartidor o
+     * el mostrador ya recibieron la plata.
+     */
+    public function cambiarEstado(int $tenantId, string $publicId, string $status, ?string $nota): void
+    {
+        $order = $this->find($tenantId, $publicId);
+        $orderId = (int) $order['id'];
+
+        $cobrado = $status === 'entregado'
+            && $order['payment_method'] === 'efectivo'
+            && $order['payment_status'] !== 'aprobado';
+
+        $this->db->beginTransaction();
+
+        try {
+            $this->db->prepare(
+                'UPDATE orders
+                    SET status = :s,
+                        payment_status = IF(:cobrado, \'aprobado\', payment_status),
+                        paid_at = IF(:cobrado2, NOW(), paid_at)
+                  WHERE id = :id AND tenant_id = :t',
+            )->execute([
+                's' => $status,
+                'cobrado' => $cobrado ? 1 : 0,
+                'cobrado2' => $cobrado ? 1 : 0,
+                'id' => $orderId,
+                't' => $tenantId,
+            ]);
+
+            $this->addEvent($orderId, $status, $nota, 'local');
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /** De qué local es un pedido. El webhook de pagos llega sin local. */
+    public function tenantDePedido(string $publicId): ?int
+    {
+        if (preg_match('/^ord_[0-9a-f]{22}$/', $publicId) !== 1) {
+            return null;
+        }
+
+        $stmt = $this->db->prepare('SELECT tenant_id FROM orders WHERE public_id = :p');
+        $stmt->execute(['p' => $publicId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    /** Si ese pago ya se procesó: Mercado Pago avisa más de una vez. */
+    public function pagoRegistrado(string $provider, string $ref): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM payments WHERE provider = :p AND provider_ref = :r');
+        $stmt->execute(['p' => $provider, 'r' => $ref]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /** Deja constancia de un pago sin mover el pedido. */
+    public function registrarPago(
+        int $orderId,
+        string $provider,
+        string $ref,
+        string $status,
+        float $amount,
+        ?string $payload,
+    ): void {
+        $this->db->prepare(
+            'INSERT INTO payments (order_id, provider, provider_ref, status, amount, payload)
+             VALUES (:o, :prov, :ref, :st, :amount, :payload)',
+        )->execute([
+            'o' => $orderId,
+            'prov' => $provider,
+            'ref' => $ref,
+            'st' => $status,
+            'amount' => Money::toDecimal(Money::toCents($amount)),
+            'payload' => $payload,
+        ]);
     }
 }

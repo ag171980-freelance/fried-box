@@ -58,6 +58,25 @@ return [
     // hasta que haya credenciales de Mercado Pago. En producción, false.
     'allow_fake_payments' => $bool($read('ALLOW_FAKE_PAYMENTS', 'true')),
 
+    // Mercado Pago. Sin access token, el cobro sigue siendo el simulado
+    // (si ALLOW_FAKE_PAYMENTS lo permite). Con token, el simulado se
+    // apaga solo y se cobra de verdad: en el sandbox si el token es de
+    // prueba (TEST-...), en serio si es de producción.
+    'mercadopago' => [
+        'access_token' => $read('MP_ACCESS_TOKEN', ''),
+        // La «clave secreta» de Tus integraciones → Webhooks. Opcional:
+        // si está, las notificaciones sin firma válida se rechazan.
+        'webhook_secret' => $read('MP_WEBHOOK_SECRET', ''),
+    ],
+
+    // Dónde vive el front: a dónde vuelve el cliente después de pagar.
+    'front_url' => rtrim($read('FRONT_URL', 'http://localhost:5173'), '/'),
+
+    // La dirección pública del backend, para que Mercado Pago avise de
+    // los pagos. Tiene que ser https y accesible desde internet; vacía
+    // en local, donde la pantalla del pedido pregunta por el pago.
+    'api_public_url' => rtrim($read('API_PUBLIC_URL', ''), '/'),
+
     'cors_origins' => array_values(array_filter(array_map(
         'trim',
         explode(',', $read('CORS_ORIGINS', 'http://localhost:5173')),

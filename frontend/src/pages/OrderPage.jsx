@@ -5,7 +5,7 @@ import { StepBar } from '../components/Topbar.jsx'
 import Icon from '../components/ui/Icon.jsx'
 import FoodLoader from '../components/ui/FoodLoader.jsx'
 import { clock } from '../lib/format.js'
-import { getOrder } from '../api/index.js'
+import { getOrder, payOrder, syncPayment } from '../api/index.js'
 import { useVenue } from '../store/VenueProvider.jsx'
 
 export default function OrderPage() {
@@ -15,16 +15,65 @@ export default function OrderPage() {
 
   const [order, setOrder] = useState(null)
   const [error, setError] = useState(null)
+  const [pagando, setPagando] = useState(false)
+  const [avisoPago, setAvisoPago] = useState(null)
+
+  // Al volver de Mercado Pago la URL trae ?payment_id=…&status=…. No se
+  // le cree: sólo sirve para decir «estamos confirmando» mientras el
+  // backend le pregunta a Mercado Pago.
+  const volviendoDePagar = new URLSearchParams(window.location.search).has('payment_id')
+
+  /** Un pedido de Mercado Pago sin pagar se pregunta a Mercado Pago. */
+  const esperaPago = (o) =>
+    o.paymentMethod === 'mercadopago' && ['pendiente_de_pago', 'pago_rechazado'].includes(o.status)
 
   useEffect(() => {
     let vigente = true
     getOrder(id, slug)
+      .then((o) => (esperaPago(o) ? syncPayment(id, slug).catch(() => o) : o))
       .then((o) => vigente && setOrder(o))
       .catch((e) => vigente && setError(e))
     return () => {
       vigente = false
     }
   }, [id, slug])
+
+  /* Mientras el pedido esté en marcha se vuelve a mirar cada tanto: el
+     local lo mueve desde su panel y el cliente lo ve sin recargar. Si
+     está esperando el pago, se mira más seguido y preguntando a Mercado
+     Pago: el pago tarda unos segundos en acreditarse. */
+  const terminado = order && ['entregado', 'cancelado', 'pago_rechazado'].includes(order.status)
+  const pagoPendiente = order && order.status === 'pendiente_de_pago' && order.paymentMethod === 'mercadopago'
+  useEffect(() => {
+    if (!order || terminado) return
+    const timer = setInterval(
+      () => {
+        if (document.visibilityState !== 'visible') return
+        ;(pagoPendiente ? syncPayment(id, slug) : getOrder(id, slug)).then(setOrder).catch(() => {
+          /* Un corte de red no borra lo que ya se ve. */
+        })
+      },
+      pagoPendiente ? 6000 : 20000,
+    )
+    return () => clearInterval(timer)
+  }, [id, slug, order, terminado, pagoPendiente])
+
+  const irAPagar = async () => {
+    setPagando(true)
+    setAvisoPago(null)
+    try {
+      const url = await payOrder(id, slug)
+      // Mercado Pago es otro dominio; el simulador vive en la app.
+      if (/^https?:/i.test(url)) {
+        window.location.href = url
+        return
+      }
+      navigate(path(url))
+    } catch (e) {
+      setAvisoPago(e.message)
+      setPagando(false)
+    }
+  }
 
   if (error) {
     return (
@@ -56,6 +105,13 @@ export default function OrderPage() {
 
   const rechazado = order.status === 'pago_rechazado'
   const pendiente = order.status === 'pendiente_de_pago'
+  const cancelado = order.status === 'cancelado'
+  const entregado = order.status === 'entregado'
+  const paso = order.flowIndex >= 0 ? order.flow[order.flowIndex] : null
+  // El motivo que escribió el local, si escribió uno.
+  const motivo = cancelado
+    ? [...order.events].reverse().find((e) => e.status === 'cancelado')?.note
+    : null
   const cuando = order.createdAt ? clock(new Date(order.createdAt)) : ''
 
   return (
@@ -66,7 +122,7 @@ export default function OrderPage() {
         <div className="orderview__hero">
           <div
             className={
-              rechazado
+              rechazado || cancelado
                 ? 'orderview__mark orderview__mark--bad'
                 : pendiente
                   ? 'orderview__mark orderview__mark--wait'
@@ -74,22 +130,37 @@ export default function OrderPage() {
             }
           >
             <Icon
-              name={rechazado ? 'close' : pendiente ? 'clock' : 'check'}
+              name={rechazado || cancelado ? 'close' : pendiente ? 'clock' : 'check'}
               size={30}
               strokeWidth={2.4}
             />
           </div>
           <h1 className="orderview__title">
-            {rechazado ? 'El pago no pasó' : pendiente ? 'Falta el pago' : 'Pedido confirmado'}
+            {cancelado
+              ? 'Pedido cancelado'
+              : rechazado
+                ? 'El pago no pasó'
+                : pendiente
+                  ? 'Falta el pago'
+                  : entregado
+                    ? '¡Que lo disfrutes!'
+                    : paso?.name || 'Pedido confirmado'}
           </h1>
           <p className="orderview__sub">
-            {rechazado
-              ? 'No se descontó nada. Probá con otro medio de pago o pagá al recibir.'
-              : pendiente
-                ? 'Te reservamos el pedido hasta que se acredite el pago.'
-                : order.mode === 'delivery'
-                  ? `Sale para ${order.customer.address} en ${order.eta}.`
-                  : `Te esperamos en ${restaurant.address} en ${order.eta}.`}
+            {cancelado
+              ? motivo ||
+                `Si tenés dudas, escribinos${restaurant.phone ? ` al ${restaurant.phone}` : ''}.`
+              : entregado
+                ? 'El pedido ya está entregado. Gracias por elegirnos.'
+                : rechazado
+                  ? 'No se descontó nada. Probá con otro medio de pago o pagá al recibir.'
+                  : pendiente
+                    ? volviendoDePagar
+                      ? 'Estamos confirmando tu pago con Mercado Pago. Tarda unos segundos.'
+                      : 'Te reservamos el pedido hasta que se acredite el pago.'
+                    : order.mode === 'delivery'
+                      ? `Sale para ${order.customer.address} en ${order.eta}.`
+                      : `Te esperamos en ${restaurant.address} en ${order.eta}.`}
           </p>
         </div>
 
@@ -122,22 +193,31 @@ export default function OrderPage() {
           reference={`#${order.number}`}
           when={cuando}
           footer={
-            rechazado
-              ? 'Pago rechazado'
-              : pendiente
-                ? 'A la espera del pago'
-                : `Gracias, ${order.customer.name}`
+            cancelado
+              ? 'Pedido cancelado'
+              : rechazado
+                ? 'Pago rechazado'
+                : pendiente
+                  ? 'A la espera del pago'
+                  : `Gracias, ${order.customer.name}`
           }
         />
 
         <div style={{ display: 'grid', gap: 'var(--s3)', marginTop: 'var(--s6)' }}>
+          {avisoPago && (
+            <div className="notice notice--warn">
+              <Icon name="ticket" size={18} />
+              <span>{avisoPago}</span>
+            </div>
+          )}
           {(rechazado || pendiente) && (
             <button
               type="button"
               className="btn btn--primary btn--block"
-              onClick={() => navigate(path(`/pago-simulado/${order.id}`))}
+              onClick={irAPagar}
+              disabled={pagando}
             >
-              {rechazado ? 'Reintentar el pago' : 'Ir a pagar'}
+              {pagando ? 'Abriendo Mercado Pago…' : rechazado ? 'Reintentar el pago' : 'Ir a pagar'}
             </button>
           )}
           <button type="button" className="btn btn--ghost btn--block" onClick={() => navigate(path())}>

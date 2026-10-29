@@ -44,6 +44,20 @@ export const LAYOUTS = [
 
 export const THEMES = [
   {
+    id: 'friedbox-claro',
+    name: 'Friedbox claro',
+    blurb: 'Naranja, negro y amarillo sobre crema. Los colores de la marca con fondo claro.',
+    bestFor: 'Friedbox',
+    swatch: ['#fff8f2', '#fe6f20', '#161618'],
+  },
+  {
+    id: 'friedbox',
+    name: 'Friedbox oscuro',
+    blurb: 'Pizarrón negro, naranja y amarillo. Los colores de la carta impresa de Friedbox.',
+    bestFor: 'Friedbox',
+    swatch: ['#161618', '#fe6f20', '#f2c22e'],
+  },
+  {
     id: 'sifon',
     name: 'Sifón',
     blurb: 'Cobalto sobre papel. El azul es la interfaz y la comida pone el calor.',
@@ -103,7 +117,7 @@ export const THEMES = [
 
 /** Último recurso si la API no contestó todavía. Tiene que coincidir con
     el data-theme de index.html, o la primera pintada cambia de color. */
-const fallback = { layout: 'grilla', theme: 'fuego' }
+const fallback = { layout: 'grilla', theme: 'friedbox-claro' }
 
 /**
  * Se puede forzar una combinación por URL para compartirla:

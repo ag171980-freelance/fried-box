@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Foodix\Admin;
 
+use Foodix\Order\PromoRules;
 use Foodix\Support\HttpException;
 use Foodix\Support\Request;
 use Foodix\Support\Response;
@@ -19,7 +20,7 @@ use Foodix\Support\Response;
 final class AdminController
 {
     /** Lo que la carta sabe dibujar; ver frontend/src/styles. */
-    private const TEMAS = ['sifon', 'tostado', 'sal', 'higo', 'menta', 'fuego', 'vermut', 'carbon'];
+    private const TEMAS = ['friedbox-claro', 'friedbox', 'sifon', 'tostado', 'sal', 'higo', 'menta', 'fuego', 'vermut', 'carbon'];
     private const ESTILOS = ['lista', 'grilla', 'mosaico', 'vidriera', 'cinta', 'carrusel'];
     private const ETIQUETAS = ['veg', 'hot', 'sintacc', 'vegano'];
     private const FORMAS = [
@@ -406,11 +407,32 @@ final class AdminController
 
         $productId = $req->float('productId');
 
+        // Sin porcentaje la promo es sólo un aviso en la carta.
+        $porcentaje = $req->float('discountPercent');
+        $porcentaje = $porcentaje === null || $porcentaje <= 0 ? null : min(100.0, round($porcentaje, 2));
+
+        $alcance = $req->enum('appliesTo', ['todo', 'rubros', 'platos'], 'todo');
+        $categoryIds = array_map('intval', $req->numList('categoryIds', 200));
+        $productIds = array_map('intval', $req->numList('productIds', 500));
+        if ($porcentaje !== null && $alcance === 'rubros' && $categoryIds === []) {
+            throw HttpException::badRequest('Elegí al menos un rubro para la promo.', 'sin_rubros');
+        }
+        if ($porcentaje !== null && $alcance === 'platos' && $productIds === []) {
+            throw HttpException::badRequest('Elegí al menos un plato para la promo.', 'sin_platos');
+        }
+
         $id = $this->repo->guardarPromo($t, $menu['id'], isset($params['id']) ? self::id($params) : null, [
             'kicker' => self::opcional($req->str('kicker', 80)),
             'title' => $titulo,
             'body' => self::opcional($req->str('body', 300)),
             'productId' => $productId === null || $productId <= 0 ? null : (int) $productId,
+            'discountPercent' => $porcentaje,
+            // Todos los días marcados es lo mismo que ninguno: se guarda
+            // NULL para que agregar un día nuevo no haga falta nunca.
+            'days' => self::dias($req->strList('days', 7, 3)),
+            'appliesTo' => $alcance,
+            'categoryIds' => $alcance === 'rubros' ? $categoryIds : [],
+            'productIds' => $alcance === 'platos' ? $productIds : [],
             'isActive' => $req->bool('isActive', true),
             'sortOrder' => self::entero($req->float('sortOrder'), 0, 9999, 999),
         ]);
@@ -424,7 +446,44 @@ final class AdminController
         [$user, $menu] = $this->contexto();
         $t = (int) $user['tenant_id'];
 
-        $this->repo->borrarPromo($t, self::id($params));
+        $id = self::id($params);
+
+        $foto = $this->repo->fotoPromo($t, $id);
+        $this->repo->borrarPromo($t, $id);
+        $this->uploads->borrarFoto($foto);
+
+        Response::json(['promos' => $this->repo->promos($t, $menu['id'])]);
+    }
+
+    /** @param array<string,string> $params */
+    public function subirFotoPromo(array $params): void
+    {
+        [$user, $menu] = $this->contexto();
+        $t = (int) $user['tenant_id'];
+        $id = self::id($params);
+
+        // Igual que con los platos: primero se confirma que la promo es
+        // de este local, después se escribe en disco.
+        $anterior = $this->repo->fotoPromo($t, $id);
+
+        $ruta = $this->uploads->guardarFoto($_FILES['foto'] ?? null, (string) $user['tenant_slug'], $id, 'promos');
+
+        $this->repo->guardarFotoPromo($t, $id, $ruta);
+        $this->uploads->borrarFoto($anterior);
+
+        Response::json(['image' => $ruta, 'promos' => $this->repo->promos($t, $menu['id'])]);
+    }
+
+    /** @param array<string,string> $params */
+    public function borrarFotoPromo(array $params): void
+    {
+        [$user, $menu] = $this->contexto();
+        $t = (int) $user['tenant_id'];
+        $id = self::id($params);
+
+        $anterior = $this->repo->fotoPromo($t, $id);
+        $this->repo->guardarFotoPromo($t, $id, null);
+        $this->uploads->borrarFoto($anterior);
 
         Response::json(['promos' => $this->repo->promos($t, $menu['id'])]);
     }
@@ -553,6 +612,7 @@ final class AdminController
                 'name' => $nombre,
                 'priceDelta' => round($delta, 2),
                 'isDefault' => !empty($c['isDefault']),
+                'isExclusive' => !empty($c['isExclusive']),
             ];
         }
 
@@ -568,6 +628,14 @@ final class AdminController
         }
 
         return $id;
+    }
+
+    /** @param list<string> $dias */
+    private static function dias(array $dias): ?string
+    {
+        $validos = array_values(array_intersect(PromoRules::DIAS, $dias));
+
+        return $validos === [] || count($validos) === count(PromoRules::DIAS) ? null : implode(',', $validos);
     }
 
     private static function entero(?float $valor, int $min, int $max, int $default): int

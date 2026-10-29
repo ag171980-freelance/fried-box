@@ -7,10 +7,10 @@ sirve. Lo que se ve en pantalla sale de la base, así que cambiar de marca
 es cargar otra carta, no tocar el código.
 
 **No hay datos simulados.** La carta, los precios, los pedidos y su estado
-salen de MySQL a través de la API en PHP. Lo único que no es real todavía es
-la pasarela de Mercado Pago, que necesita credenciales: hasta entonces el
-cobro se cierra con un endpoint marcado como simulado, y el pedido que queda
-guardado es un pedido de verdad.
+salen de MySQL a través de la API en PHP. El cobro es Mercado Pago (Checkout
+Pro) apenas se carga `MP_ACCESS_TOKEN` en `backend/.env`; sin token, cae en un
+endpoint marcado como simulado, y el pedido que queda guardado es un pedido de
+verdad. Ver «Mercado Pago» en `backend/README.md`.
 
 ```
 foodix/
@@ -28,6 +28,7 @@ Hacen falta las tres piezas: sin backend el front no tiene qué mostrar.
 #      backend/database/pedidos.sql    esquema de pedidos
 #      backend/database/friedbox.sql   la carta de Friedbox
 #      backend/database/admin.sql      usuarios del panel y abierto/cerrado
+#      backend/database/promos.sql     descuentos de las promos (días, rubros, platos)
 
 # 2. backend
 cp backend/.env.example backend/.env      # y ajustar la conexión
@@ -249,10 +250,10 @@ frontend/src/
   No es una opción que elija nadie: si hay foto, va la foto.
 - **La comanda es la misma pieza en tres pantallas.** Cambia si se puede editar
   y qué pie lleva; el resto es idéntico.
-- **El pago con Mercado Pago está simulado en `/pago-simulado/:id`.** Está
-  marcada como pasarela simulada a propósito: no imita la pantalla real. Cuando
-  el backend cree la preferencia, `createOrder()` va a devolver el `init_point`
-  verdadero y esa ruta se borra.
+- **Sin token de Mercado Pago, el pago se simula en `/pago-simulado/:id`.**
+  Está marcada como pasarela simulada a propósito: no imita la pantalla real.
+  Con token, `createOrder()` devuelve el link de Mercado Pago y esa ruta no se
+  usa.
 
 ## Movimiento
 
@@ -275,13 +276,8 @@ repetirlo.
 
 ## Lo que falta
 
-- **Mercado Pago de verdad.** Es lo único simulado que queda. Detalle en
-  `backend/README.md`.
-- **Los pedidos, en el panel.** El panel administra la carta y el local,
-  pero todavía no muestra los pedidos que entran. Los estados posteriores a
-  `confirmado` existen en la base y no los mueve nadie, así que el
-  seguimiento que ve el cliente se queda en el primer paso. Es la pieza
-  grande que sigue.
+- **Devoluciones de Mercado Pago.** Un pago devuelto o contracargado después
+  de aprobado no mueve el pedido; se hace a mano desde Mercado Pago.
 - **Recuperar la contraseña.** Hoy, si alguien la pierde, se la vuelve a
   poner con `nuevo-usuario.php`. Falta el circuito por mail.
 - **Fotos de Friedbox.** Hoy son las provisorias de Unsplash, y once platos

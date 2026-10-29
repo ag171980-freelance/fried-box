@@ -38,10 +38,13 @@ final class Pricing
         $slugs = array_values(array_unique(array_column($lines, 'itemId')));
         $products = $slugs === [] ? [] : $this->products($tenantId, $menuId, $slugs);
         $allowed = $products === [] ? [] : $this->allowedChoices($tenantId, $menuId, array_column($products, 'id'));
+        $promos = $products === [] ? [] : (new PromoRules($this->db))->vigentesHoy($tenantId, $menuId);
 
         $issues = [];
         $priced = [];
         $subtotalCents = 0;
+        $promoCents = 0;
+        $promosAplicadas = [];
 
         foreach ($lines as $line) {
             $product = $products[$line['itemId']] ?? null;
@@ -80,7 +83,7 @@ final class Pricing
                     ];
                     continue;
                 }
-                $picked[$choiceSlug] = $choices[$choiceSlug];
+                $picked[] = $choices[$choiceSlug];
                 $extraCents += Money::toCents($choices[$choiceSlug]['price_delta']);
             }
 
@@ -92,6 +95,14 @@ final class Pricing
             $totalCents = $unitCents * $line['qty'];
             $subtotalCents += $totalCents;
 
+            // La promo se calcula sobre la línea entera, opciones incluidas.
+            $promo = PromoRules::mejorPara($promos, $productId, (int) $product['category_id']);
+            $lineaPromoCents = $promo === null ? 0 : Money::percentOf($totalCents, $promo['percent']);
+            $promoCents += $lineaPromoCents;
+            if ($promo !== null) {
+                $promosAplicadas[$promo['id']] = $promo['title'];
+            }
+
             $priced[] = [
                 'key' => $line['key'],
                 'itemId' => $product['slug'],
@@ -101,10 +112,15 @@ final class Pricing
                 'basePrice' => Money::fromCents(Money::toCents($product['price'])),
                 'unitPrice' => Money::fromCents($unitCents),
                 'total' => Money::fromCents($totalCents),
-                'options' => array_values($picked),
-                'optionsLabel' => implode(' · ', array_column($picked, 'choice_name')),
+                'options' => $picked,
+                'optionsLabel' => self::label(array_column($picked, 'choice_name')),
                 'note' => $line['note'],
                 'available' => true,
+                'promo' => $promo === null ? null : [
+                    'title' => $promo['title'],
+                    'percent' => $promo['percent'],
+                    'discount' => Money::fromCents($lineaPromoCents),
+                ],
             ];
         }
 
@@ -114,11 +130,15 @@ final class Pricing
 
         [$coupon, $couponError] = $this->coupon($tenantId, $couponCode, $subtotalCents);
 
+        // El cupón va sobre lo que queda después de la promo: un 10% de
+        // cupón encima de un 10% de promo no descuenta un 20% del total.
+        $baseCuponCents = $subtotalCents - $promoCents;
+
         $discountCents = 0;
         if ($coupon !== null) {
             $discountCents = match ($coupon['type']) {
-                'percent' => Money::percentOf($subtotalCents, (float) $coupon['value']),
-                'fixed' => min(Money::toCents($coupon['value']), $subtotalCents),
+                'percent' => Money::percentOf($baseCuponCents, (float) $coupon['value']),
+                'fixed' => min(Money::toCents($coupon['value']), $baseCuponCents),
                 default => 0,
             };
             if ($coupon['type'] === 'shipping') {
@@ -126,13 +146,15 @@ final class Pricing
             }
         }
 
-        $totalCents = max(0, $subtotalCents - $discountCents + $shippingCents);
+        $totalCents = max(0, $subtotalCents - $promoCents - $discountCents + $shippingCents);
         $belowMinimum = $mode === 'delivery' && $subtotalCents < $minOrderCents;
 
         return [
             'lines' => $priced,
             'subtotal' => Money::fromCents($subtotalCents),
             'discount' => Money::fromCents($discountCents),
+            'promoDiscount' => Money::fromCents($promoCents),
+            'promoLabel' => $promosAplicadas === [] ? null : implode(' · ', $promosAplicadas),
             'shipping' => Money::fromCents($shippingCents),
             'total' => Money::fromCents($totalCents),
             'currency' => $settings['currency'],
@@ -153,10 +175,27 @@ final class Pricing
             'cents' => [
                 'subtotal' => $subtotalCents,
                 'discount' => $discountCents,
+                'promoDiscount' => $promoCents,
                 'shipping' => $shippingCents,
                 'total' => $totalCents,
             ],
         ];
+    }
+
+    /**
+     * El resumen de opciones de una línea. Las repetidas se juntan:
+     * «Mayo de ajo x2 · Barbacoa», no «Mayo de ajo · Mayo de ajo · Barbacoa».
+     *
+     * @param list<string> $names
+     */
+    public static function label(array $names): string
+    {
+        $parts = [];
+        foreach (array_count_values($names) as $name => $count) {
+            $parts[] = $count > 1 ? sprintf('%s x%d', $name, $count) : (string) $name;
+        }
+
+        return implode(' · ', $parts);
     }
 
     /**
@@ -166,7 +205,7 @@ final class Pricing
      *
      * @param array<string,mixed> $product
      * @param array<string,array<string,mixed>> $choices
-     * @param array<string,array<string,mixed>> $picked
+     * @param list<array<string,mixed>> $picked
      * @return list<array<string,string>>
      */
     private function groupIssues(string $key, array $product, array $choices, array $picked): array
@@ -181,11 +220,15 @@ final class Pricing
                 'required' => (bool) $choice['group_required'],
                 'max' => $choice['group_max'] === null ? null : (int) $choice['group_max'],
                 'elegidas' => 0,
+                'sola' => null,
             ];
         }
 
         foreach ($picked as $choice) {
             $porGrupo[$choice['group_slug']]['elegidas']++;
+            if ($choice['is_exclusive']) {
+                $porGrupo[$choice['group_slug']]['sola'] = $choice['choice_name'];
+            }
         }
 
         foreach ($porGrupo as $grupo) {
@@ -193,21 +236,28 @@ final class Pricing
                 $issues[] = [
                     'key' => $key,
                     'codigo' => 'falta_elegir',
-                    'mensaje' => sprintf('Falta elegir %s en %s.', mb_strtolower($grupo['name']), $product['name']),
+                    'mensaje' => sprintf('En %s falta completar «%s».', $product['name'], $grupo['name']),
                 ];
             }
             if ($grupo['type'] === 'single' && $grupo['elegidas'] > 1) {
                 $issues[] = [
                     'key' => $key,
                     'codigo' => 'demasiadas_opciones',
-                    'mensaje' => sprintf('En %s se elige una sola opción.', mb_strtolower($grupo['name'])),
+                    'mensaje' => sprintf('En «%s» se elige una sola opción.', $grupo['name']),
+                ];
+            }
+            if ($grupo['sola'] !== null && $grupo['elegidas'] > 1) {
+                $issues[] = [
+                    'key' => $key,
+                    'codigo' => 'opcion_sola',
+                    'mensaje' => sprintf('«%s» no se combina con otras opciones en %s.', $grupo['sola'], $product['name']),
                 ];
             }
             if ($grupo['max'] !== null && $grupo['elegidas'] > $grupo['max']) {
                 $issues[] = [
                     'key' => $key,
                     'codigo' => 'demasiadas_opciones',
-                    'mensaje' => sprintf('En %s se eligen hasta %d.', mb_strtolower($grupo['name']), $grupo['max']),
+                    'mensaje' => sprintf('En «%s» se eligen hasta %d.', $grupo['name'], $grupo['max']),
                 ];
             }
         }
@@ -223,7 +273,7 @@ final class Pricing
     {
         $in = implode(',', array_fill(0, count($slugs), '?'));
         $stmt = $this->db->prepare(
-            "SELECT id, slug, name, price
+            "SELECT id, slug, name, price, category_id
                FROM products
               WHERE tenant_id = ? AND menu_id = ? AND is_available = 1
                 AND slug IN ($in)",
@@ -255,7 +305,7 @@ final class Pricing
                     og.slug AS group_slug, og.name AS group_name, og.type AS group_type,
                     og.is_required AS group_required, og.max_choices AS group_max,
                     oc.id AS choice_id, oc.slug AS choice_slug, oc.name AS choice_name,
-                    oc.price_delta
+                    oc.price_delta, oc.is_exclusive
                FROM product_option_groups pog
                JOIN option_groups og ON og.id = pog.option_group_id
                JOIN option_choices oc ON oc.option_group_id = og.id

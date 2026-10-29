@@ -8,7 +8,7 @@ use Foodix\Support\HttpException;
 use Foodix\Support\Slug;
 
 /**
- * Las fotos de los platos que sube el local.
+ * Las fotos que sube el local: de los platos y de las promos.
  *
  * Lo que entra por acá es un archivo que mandó alguien de afuera, así
  * que no se le cree nada: ni el nombre, ni la extensión, ni el
@@ -32,7 +32,10 @@ final class Uploads
     private const LADO_MIN_SM = 480;             // la versión chica del srcset
 
     /** Lo que el front pide como /uploads/... y Vite proxea al backend. */
-    private const RUTA_PUBLICA = '/uploads/platos';
+    private const RUTA_PUBLICA = '/uploads';
+
+    /** Las carpetas que existen. Nunca se arma una con algo que vino de afuera. */
+    private const CARPETAS = ['platos', 'promos'];
 
     public function __construct(private readonly string $dirPublico)
     {
@@ -42,9 +45,14 @@ final class Uploads
      * Procesa $_FILES['foto'] y devuelve la ruta pública a guardar.
      *
      * @param array<string,mixed>|null $archivo
+     * @param 'platos'|'promos' $carpeta
      */
-    public function guardarFoto(?array $archivo, string $tenantSlug, int $productId): string
+    public function guardarFoto(?array $archivo, string $tenantSlug, int $id, string $carpeta = 'platos'): string
     {
+        if (!in_array($carpeta, self::CARPETAS, true)) {
+            throw new \InvalidArgumentException('Carpeta de subidas desconocida: ' . $carpeta);
+        }
+
         if ($archivo === null || ($archivo['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             throw HttpException::badRequest('No llegó ninguna imagen.', 'sin_archivo');
         }
@@ -102,7 +110,7 @@ final class Uploads
             throw HttpException::badRequest('No pudimos abrir la imagen.', 'imagen_rota');
         }
 
-        $dir = $this->dirPublico . '/platos';
+        $dir = $this->dirPublico . '/' . $carpeta;
         if (!is_dir($dir) && !@mkdir($dir, 0o755, true) && !is_dir($dir)) {
             throw new HttpException(500, 'No pudimos crear la carpeta de imágenes.', 'sin_carpeta');
         }
@@ -111,18 +119,18 @@ final class Uploads
 
         // El nombre lo armamos nosotros. El del archivo original no se usa
         // ni para derivarlo: ahí es donde entran los ../ y los .php.
-        $base = sprintf('%s-%d-%s', Slug::de($tenantSlug), $productId, bin2hex(random_bytes(4)));
+        $base = sprintf('%s-%d-%s', Slug::de($tenantSlug), $id, bin2hex(random_bytes(4)));
 
         $grande = $this->escribirJpeg($origen, $dir . '/' . $base . '.jpg', self::LADO_MAX);
         $chica = $this->escribirJpeg($origen, $dir . '/' . $base . '-sm.jpg', self::LADO_MIN_SM);
 
-        imagedestroy($origen);
-
+        // Sin imagedestroy(): no hace nada desde PHP 8.0 y en 8.5 avisa que
+        // está obsoleta, y ese aviso rompe el JSON de la respuesta.
         if (!$grande || !$chica) {
             throw new HttpException(500, 'No pudimos guardar la imagen.', 'escritura_fallida');
         }
 
-        return self::RUTA_PUBLICA . '/' . $base . '.jpg';
+        return self::RUTA_PUBLICA . '/' . $carpeta . '/' . $base . '.jpg';
     }
 
     /**
@@ -134,7 +142,17 @@ final class Uploads
      */
     public function borrarFoto(?string $rutaPublica): void
     {
-        if ($rutaPublica === null || !str_starts_with($rutaPublica, self::RUTA_PUBLICA . '/')) {
+        if ($rutaPublica === null) {
+            return;
+        }
+
+        $carpeta = null;
+        foreach (self::CARPETAS as $c) {
+            if (str_starts_with($rutaPublica, self::RUTA_PUBLICA . '/' . $c . '/')) {
+                $carpeta = $c;
+            }
+        }
+        if ($carpeta === null) {
             return;
         }
 
@@ -143,7 +161,7 @@ final class Uploads
             return;
         }
 
-        $dir = $this->dirPublico . '/platos';
+        $dir = $this->dirPublico . '/' . $carpeta;
         @unlink($dir . '/' . $nombre);
         @unlink($dir . '/' . substr($nombre, 0, -4) . '-sm.jpg');
     }
@@ -170,10 +188,7 @@ final class Uploads
 
         imagecopyresampled($lienzo, $origen, 0, 0, 0, 0, $nuevoAncho, $nuevoAlto, $ancho, $alto);
 
-        $ok = imagejpeg($lienzo, $destino, 82);
-        imagedestroy($lienzo);
-
-        return $ok;
+        return imagejpeg($lienzo, $destino, 82);
     }
 
     /**

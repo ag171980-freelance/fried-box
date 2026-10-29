@@ -17,3 +17,9 @@ export const BRAND = import.meta.env.VITE_BRAND || 'friedbox'
  * Una vez que la API contesta manda `restaurant.name`.
  */
 export const BRAND_NAME = import.meta.env.VITE_BRAND_NAME || 'Friedbox'
+
+/**
+ * La imagen de una promo que todavía no tiene una propia. Es material
+ * del repositorio (ver public/img/promos/CREDITOS.md), no del local.
+ */
+export const PROMO_IMAGE = import.meta.env.VITE_PROMO_IMAGE || '/img/promos/pollo-frito.jpg'

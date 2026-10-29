@@ -71,6 +71,12 @@ export default function Ticket({
           <span>Subtotal</span>
           <span>{money(quote.subtotal)}</span>
         </p>
+        {quote.promoDiscount > 0 && (
+          <p className="tsum tsum--save">
+            <span>Promo {quote.promoLabel ? `(${quote.promoLabel})` : ''}</span>
+            <span>− {money(quote.promoDiscount)}</span>
+          </p>
+        )}
         {quote.discount > 0 && (
           <p className="tsum tsum--save">
             <span>Descuento {quote.coupon ? `(${quote.coupon.code})` : ''}</span>
@@ -87,12 +93,7 @@ export default function Ticket({
         </p>
       </div>
 
-      {footer !== null && (
-        <>
-          <p className="ticket__stamp">{footer || `Listo en ${quote.eta}`}</p>
-          <div className="ticket__code" aria-hidden="true" />
-        </>
-      )}
+      {footer && <p className="ticket__stamp">{footer}</p>}
     </div>
   )
 }

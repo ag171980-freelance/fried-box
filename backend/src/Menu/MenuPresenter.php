@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Foodix\Menu;
 
+use Foodix\Order\PromoRules;
+
 /**
  * El contrato con el front vive acá.
  *
@@ -55,12 +57,19 @@ final class MenuPresenter
                 $products,
             ),
             'promos' => array_map(
-                static fn (array $p): array => [
+                fn (array $p): array => [
                     'id' => $p['slug'],
                     'kicker' => $p['kicker'],
                     'title' => $p['title'],
                     'body' => $p['body'],
+                    // Null: el front pone la imagen genérica de la marca.
+                    'image' => $this->asset($p['image_path']),
                     'itemId' => $p['product_slug'],
+                    'percent' => $p['discount_percent'] === null ? null : (float) $p['discount_percent'],
+                    'days' => $p['days'] === null || $p['days'] === '' ? [] : explode(',', $p['days']),
+                    // Si descuenta hoy. Una promo de los lunes se sigue
+                    // mostrando el martes, pero el ticket no la aplica.
+                    'today' => PromoRules::valeElDia($p['days'], PromoRules::hoy()),
                 ],
                 $promos,
             ),
@@ -162,6 +171,8 @@ final class MenuPresenter
                     'name' => $c['name'],
                     'price' => (float) $c['price_delta'],
                     'default' => (bool) $c['is_default'],
+                    // Va sola: «Sin salsas» no se combina con las salsas.
+                    'exclusive' => (bool) $c['is_exclusive'],
                 ],
                 $g['choices'],
             ),

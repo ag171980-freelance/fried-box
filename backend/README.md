@@ -1,8 +1,7 @@
 # Backend
 
-PHP vanilla, sin Composer ni framework. Sirve la carta y los pedidos. Lo único
-que falta es Mercado Pago de verdad: hasta que haya credenciales, el cobro se
-cierra con un endpoint marcado como simulado.
+PHP vanilla, sin Composer ni framework. Sirve la carta, los pedidos, el panel
+del local y el cobro con Mercado Pago.
 
 ## Poner en marcha
 
@@ -195,19 +194,52 @@ Apache 2.4 las reglas de autorización se combinan con las del padre: un
   entregarle a un cliente la carta de otro restaurante. Va con
   `Vary: X-Tenant` además.
 
+## Mercado Pago
+
+Checkout Pro por API REST, sin SDK (`src/Payment/`). El token vive en el
+`.env`, nunca en el repo ni en el front.
+
+**Probar con credenciales de prueba:**
+
+1. En [Tus integraciones](https://www.mercadopago.com.ar/developers/panel/app)
+   crear una aplicación (Checkout Pro) y copiar el **access token de prueba**.
+2. Pegarlo en `backend/.env` como `MP_ACCESS_TOKEN=TEST-...`.
+3. `php tools/check.php` tiene que decir «Mercado Pago responde · token de PRUEBA».
+4. Hacer un pedido eligiendo Mercado Pago y pagar con una
+   [tarjeta de prueba](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/additional-content/your-integrations/test/cards)
+   (titular `APRO` aprueba, `OTHE` rechaza). Para pagar conviene una ventana de
+   incógnito o un usuario de prueba comprador: Mercado Pago no deja que la
+   misma cuenta se pague a sí misma.
+
+**Cómo se confirma un pago.** El pedido se crea en `pendiente_de_pago`, el
+backend arma la preferencia (un ítem con el total del pedido, `external_reference`
+= el id público) y el cliente sale a Mercado Pago. Al volver, la pantalla del
+pedido llama a `POST /orders/{id}/pago/sincronizar`, que busca los pagos de ese
+pedido **en la API de Mercado Pago** y los aplica; lo que viene en la URL de
+vuelta no se usa para nada. En producción además llega el webhook a
+`POST /webhooks/mercadopago`, que hace lo mismo con el id que trae.
+
+Las reglas (en `Cobros.php`): un pago ya registrado no se procesa dos veces;
+un aprobado cuyo monto no coincide con el total no confirma el pedido y deja
+un aviso en su historial; un pago que llega para un pedido cancelado tampoco lo
+revive (queda el aviso para devolverlo); un rechazo viejo no pisa un aprobado.
+
+**Variables:** `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` (valida la firma de los
+avisos), `FRONT_URL` (a dónde vuelve el cliente) y `API_PUBLIC_URL` (el https
+público del backend; sin esto no hay webhook). Con token cargado,
+`ALLOW_FAKE_PAYMENTS` deja de tener efecto: el simulador se apaga solo.
+
+**Para producción:** token de producción, `FRONT_URL` y `API_PUBLIC_URL` con
+https (así Mercado Pago vuelve solo al pedido y avisa por webhook), y en Tus
+integraciones → Webhooks apuntar a `{API_PUBLIC_URL}/webhooks/mercadopago`
+con el evento «Pagos» y copiar la clave secreta a `MP_WEBHOOK_SECRET`.
+
 ## Lo que sigue
 
-- **Mercado Pago de verdad.** Crear la preferencia con el SDK o la API REST,
-  verificar la firma del webhook y volver a consultar el pago por API antes de
-  dar una orden por pagada. El access token va en variable de entorno, nunca
-  en el repo ni en el front. Cuando esté: `checkoutUrl` pasa a ser el
-  `init_point`, se agrega `POST /webhooks/mercadopago` y
-  `ALLOW_FAKE_PAYMENTS` se pone en false.
-- **Un panel para el local**: editar la carta, ver los pedidos que entran,
-  moverlos de estado y elegir paleta y estilo de carta. Hoy los estados
-  posteriores a `confirmado` existen en la base pero no los mueve nadie, y
-  `tenant_settings.theme` / `.layout` se cambian a mano por SQL.
-- **Autenticación** para ese panel. Todo lo que hay ahora es público de lectura.
+- **Devoluciones.** Un pago devuelto o contracargado después de aprobado no
+  mueve el pedido.
+- **Un token por local.** Hoy hay uno solo en el `.env`: alcanza para una
+  marca. Con varias, va en `tenant_settings` y se carga desde el panel.
 - **Sacar `DEFAULT_TENANT`.**
 - **Limitar la tasa de `POST /orders`**, o alcanza con un script para llenar la
   cocina de pedidos falsos.

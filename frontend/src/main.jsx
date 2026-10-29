@@ -1,13 +1,16 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import AdminApp from './admin/AdminApp.jsx'
 import App from './App.jsx'
 import { BRAND } from './brand.js'
 import { CartProvider } from './store/CartProvider.jsx'
 import { PrefsProvider } from './store/PrefsProvider.jsx'
 import { VenueProvider } from './store/VenueProvider.jsx'
 import './styles/index.css'
+
+// El panel se baja recién al entrar a /admin. Trae Chart.js y todas las
+// pantallas del local, y el cliente que viene a pedir no los necesita.
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'))
 
 /**
  * Dos aplicaciones en el mismo árbol.
@@ -24,7 +27,14 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/admin/*" element={<AdminApp />} />
+        <Route
+          path="/admin/*"
+          element={
+            <Suspense fallback={null}>
+              <AdminApp />
+            </Suspense>
+          }
+        />
         <Route
           path="/*"
           element={

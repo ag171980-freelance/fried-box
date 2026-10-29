@@ -161,17 +161,6 @@
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.ticket__code {
-  margin-top: var(--s3);
-  height: 34px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--ink) 0 2px, transparent 2px 4px,
-    var(--ink) 4px 5px, transparent 5px 9px,
-    var(--ink) 9px 12px, transparent 12px 14px
-  );
-  opacity: 0.85;
-}
 
 /* --- Cupón ------------------------------------------------------ */
 .coupon {

@@ -328,6 +328,86 @@
   --shadow-3: 0 -10px 44px rgba(0, 0, 0, 0.62);
 }
 
+/* ============================================================
+   TEMA · Friedbox
+   Los colores de su carta impresa: pizarrón negro, naranja de las
+   bandas y los títulos, y el amarillo de las rayas y del logo.
+   El naranja lleva letra negra: con blanco no llega al contraste.
+   ============================================================ */
+[data-theme='friedbox'] {
+  color-scheme: dark;
+  --bg: #161618;
+  --surface: #1f1f22;
+  --surface-2: #29282d;
+  --surface-sunk: #111113;
+  --ink: #f7f4ef;
+  --ink-2: #b8b2aa;
+  --ink-3: #807b74;
+  --line: #302f34;
+  --line-strong: #47454c;
+
+  --brand: #fe6f20;
+  --brand-hover: #ff8742;
+  --brand-ink: #161618;
+  --brand-wash: #3b2417;
+
+  --accent: #f2c22e;
+  --accent-ink: #161618;
+
+  /* Barras de los gráficos: el naranja un paso más profundo, validado
+     contra este fondo (el de la marca no llega a 3:1 sobre claro). */
+  --chart-mark: #e85d10;
+
+  --danger: #ff5c4d;
+  --ok: #3fcf8e;
+
+  --plate: #252429;
+  --plate-shadow: rgba(0, 0, 0, 0.5);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 -10px 44px rgba(0, 0, 0, 0.62);
+}
+
+/* ============================================================
+   TEMA · Friedbox claro
+   Los mismos tres colores sobre crema, como sus placas de fondo
+   naranja: el negro pasa a ser la letra y el naranja, el relleno.
+   El naranja sigue con letra negra: sobre claro no da para texto.
+   ============================================================ */
+[data-theme='friedbox-claro'] {
+  color-scheme: light;
+  --bg: #fff8f2;
+  --surface: #ffffff;
+  --surface-2: #fff0e4;
+  --surface-sunk: #f7ebe0;
+  --ink: #161618;
+  --ink-2: #5c5652;
+  --ink-3: #8e8680;
+  --line: #f0dfd1;
+  --line-strong: #dfc6b2;
+
+  --brand: #fe6f20;
+  --brand-hover: #ec5f12;
+  --brand-ink: #161618;
+  --brand-wash: #ffe6d5;
+
+  --accent: #f2c22e;
+  --accent-ink: #161618;
+
+  /* Barras de los gráficos: el naranja un paso más profundo, validado
+     contra este fondo (el de la marca no llega a 3:1 sobre claro). */
+  --chart-mark: #e85d10;
+
+  --danger: #d63a1e;
+  --ok: #14804a;
+
+  --plate: #ffffff;
+  --plate-shadow: rgba(22, 22, 24, 0.1);
+  --shadow-1: 0 1px 2px rgba(22, 22, 24, 0.05), 0 2px 8px rgba(22, 22, 24, 0.05);
+  --shadow-2: 0 8px 28px rgba(22, 22, 24, 0.12);
+  --shadow-3: 0 -8px 40px rgba(22, 22, 24, 0.15);
+}
+
 /* Padding de las tarjetas de menú -------------------------------- */
 :root { --card-pad: var(--s4); --card-gap: var(--s3); }
 

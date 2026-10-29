@@ -219,6 +219,8 @@ final class Request
                 continue;
             }
 
+            // Puede venir repetida: tres salsas pueden ser dos de ajo y una
+            // barbacoa. El tope de cada grupo lo controla Pricing.
             $optionIds = [];
             if (isset($line['optionIds']) && is_array($line['optionIds'])) {
                 foreach (array_slice($line['optionIds'], 0, 20) as $opt) {
@@ -239,7 +241,7 @@ final class Request
                 'key' => $key,
                 'itemId' => $itemId,
                 'qty' => min($qty, 99),
-                'optionIds' => array_values(array_unique($optionIds)),
+                'optionIds' => $optionIds,
                 'note' => $note,
             ];
         }

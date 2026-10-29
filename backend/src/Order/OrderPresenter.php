@@ -33,7 +33,7 @@ final class OrderPresenter
                 'qty' => (int) $item['qty'],
                 'unitPrice' => (float) $item['unit_price'],
                 'total' => (float) $item['line_total'],
-                'optionsLabel' => implode(' · ', array_column($options, 'name')),
+                'optionsLabel' => Pricing::label(array_column($options, 'name')),
                 'note' => $item['note'],
                 'available' => true,
             ];
@@ -64,6 +64,8 @@ final class OrderPresenter
             'lines' => $lines,
             'subtotal' => (float) $order['subtotal'],
             'discount' => (float) $order['discount'],
+            'promoDiscount' => (float) $order['promo_discount'],
+            'promoLabel' => $order['promo_label'],
             'shipping' => (float) $order['shipping'],
             'total' => (float) $order['total'],
             'currency' => $order['currency'],
@@ -88,7 +90,7 @@ final class OrderPresenter
                     'note' => $e['note'],
                     'at' => self::iso($e['created_at']),
                 ],
-                $order['events'],
+                $order['events'] ?? [],
             ),
         ];
     }

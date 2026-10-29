@@ -50,33 +50,58 @@ export default function ItemSheet({ item, onClose, onConfirm }) {
     }
   }, [dismiss])
 
+  /* En los grupos múltiples una opción puede ir más de una vez: el id
+     se repite en la lista tantas veces como se eligió. */
   const { optionIds, unitPrice, extrasLabel } = useMemo(() => {
     const ids = Object.values(picked).flat()
     let extra = 0
     const names = []
     for (const group of item.options || []) {
+      const ingroup = picked[group.id] || []
       for (const choice of group.choices) {
-        if (ids.includes(choice.id)) {
-          extra += choice.price
-          if (choice.price > 0 || group.type === 'single') names.push(choice.name)
-        }
+        const n = ingroup.filter((id) => id === choice.id).length
+        if (n === 0) continue
+        extra += choice.price * n
+        names.push(n > 1 ? `${choice.name} x${n}` : choice.name)
       }
     }
     return { optionIds: ids, unitPrice: item.price + extra, extrasLabel: names.join(' · ') }
   }, [picked, item])
 
-  const toggle = (group, choiceId) => {
+  const choose = (group, choiceId) =>
+    setPicked((prev) => ({ ...prev, [group.id]: [choiceId] }))
+
+  /* Una opción que va sola («Sin salsas») no convive con las demás:
+     elegirla vacía el grupo, y sumar otra la saca. */
+  const solas = (group) => group.choices.filter((c) => c.exclusive).map((c) => c.id)
+
+  const toggleSola = (group, choiceId) =>
     setPicked((prev) => {
-      if (group.type === 'single') return { ...prev, [group.id]: [choiceId] }
       const current = prev[group.id] || []
-      const next = current.includes(choiceId)
-        ? current.filter((id) => id !== choiceId)
-        : [...current, choiceId].slice(0, group.max || 99)
-      return { ...prev, [group.id]: next }
+      return { ...prev, [group.id]: current.includes(choiceId) ? [] : [choiceId] }
     })
-  }
+
+  const add = (group, choiceId) =>
+    setPicked((prev) => {
+      const current = (prev[group.id] || []).filter((id) => !solas(group).includes(id))
+      if (current.length >= (group.max || 99)) return prev
+      return { ...prev, [group.id]: [...current, choiceId] }
+    })
+
+  const remove = (group, choiceId) =>
+    setPicked((prev) => {
+      const current = prev[group.id] || []
+      const at = current.lastIndexOf(choiceId)
+      if (at === -1) return prev
+      return { ...prev, [group.id]: current.filter((_, i) => i !== at) }
+    })
+
+  /* Los grupos obligatorios sin nada elegido. Mientras haya alguno, el
+     botón de agregar queda apagado: el servidor lo rechazaría igual. */
+  const faltan = (item.options || []).filter((g) => g.required && !(picked[g.id] || []).length)
 
   const confirm = () => {
+    if (faltan.length) return
     const payload = {
       itemId: item.id,
       qty,
@@ -117,33 +142,94 @@ export default function ItemSheet({ item, onClose, onConfirm }) {
             <p className="sheet__desc">{item.description}</p>
             <p className="sheet__price u-price">{money(item.price)}</p>
 
-            {(item.options || []).map((group) => (
-              <fieldset key={group.id} className="optgroup">
-                <div className="optgroup__head">
-                  <legend className="optgroup__name">{group.name}</legend>
-                  <span className="optgroup__rule u-mono">
-                    {group.required
-                      ? 'Elegí una'
-                      : `Hasta ${group.max || group.choices.length}`}
-                  </span>
-                </div>
+            {(item.options || []).map((group) => {
+              const ingroup = picked[group.id] || []
+              const sola = ingroup.find((id) => solas(group).includes(id))
+              const elegidas = sola ? 0 : ingroup.length
+              const full = elegidas >= (group.max || 99)
 
-                {group.choices.map((choice) => (
-                  <label key={choice.id} className="opt">
-                    <input
-                      type={group.type === 'single' ? 'radio' : 'checkbox'}
-                      name={`${item.id}-${group.id}`}
-                      checked={(picked[group.id] || []).includes(choice.id)}
-                      onChange={() => toggle(group, choice.id)}
-                    />
-                    <span className="opt__name">{choice.name}</span>
-                    <span className="opt__price">
-                      {choice.price > 0 ? `+ ${money(choice.price)}` : 'sin cargo'}
+              return (
+                <fieldset key={group.id} className="optgroup">
+                  <div className="optgroup__head">
+                    <legend className="optgroup__name">{group.name}</legend>
+                    <span className="optgroup__rule u-mono">
+                      {group.type === 'single'
+                        ? 'Elegí una'
+                        : sola
+                          ? 'Listo'
+                          : group.required && elegidas === 0
+                            ? 'Obligatorio'
+                            : `${elegidas} de ${group.max || group.choices.length}`}
                     </span>
-                  </label>
-                ))}
-              </fieldset>
-            ))}
+                  </div>
+
+                  {group.type === 'single'
+                    ? group.choices.map((choice) => (
+                        <label key={choice.id} className="opt">
+                          <input
+                            type="radio"
+                            name={`${item.id}-${group.id}`}
+                            checked={ingroup.includes(choice.id)}
+                            onChange={() => choose(group, choice.id)}
+                          />
+                          <span className="opt__name">{choice.name}</span>
+                          {choice.price > 0 && (
+                            <span className="opt__price">+ {money(choice.price)}</span>
+                          )}
+                        </label>
+                      ))
+                    : group.choices.map((choice) => {
+                        const n = ingroup.filter((id) => id === choice.id).length
+
+                        if (choice.exclusive) {
+                          return (
+                            <label key={choice.id} className="opt opt--sola">
+                              <input
+                                type="checkbox"
+                                checked={n > 0}
+                                onChange={() => toggleSola(group, choice.id)}
+                              />
+                              <span className="opt__name">{choice.name}</span>
+                              {choice.price > 0 && (
+                                <span className="opt__price">+ {money(choice.price)}</span>
+                              )}
+                            </label>
+                          )
+                        }
+
+                        return (
+                          <div key={choice.id} className={n > 0 ? 'opt is-picked' : 'opt'}>
+                            <span className="opt__name">{choice.name}</span>
+                            {choice.price > 0 && (
+                              <span className="opt__price">+ {money(choice.price)}</span>
+                            )}
+                            <div className="qty qty--opt">
+                              <button
+                                type="button"
+                                className="qty__btn"
+                                onClick={() => remove(group, choice.id)}
+                                disabled={n === 0}
+                                aria-label={`Quitar ${choice.name}`}
+                              >
+                                <Icon name="minus" size={14} strokeWidth={2.2} />
+                              </button>
+                              <span className="qty__n" aria-live="polite">{n}</span>
+                              <button
+                                type="button"
+                                className="qty__btn"
+                                onClick={() => add(group, choice.id)}
+                                disabled={full}
+                                aria-label={`Sumar ${choice.name}`}
+                              >
+                                <Icon name="plus" size={14} strokeWidth={2.2} />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                </fieldset>
+              )
+            })}
 
             <div className="sheet__note field">
               <label className="field__label" htmlFor={`note-${item.id}`}>
@@ -152,7 +238,7 @@ export default function ItemSheet({ item, onClose, onConfirm }) {
               <textarea
                 id={`note-${item.id}`}
                 className="field__textarea"
-                placeholder="Sin cebolla, cortada al medio, lo que necesites."
+                placeholder="Bien crocante, las salsas aparte, lo que necesites."
                 value={note}
                 maxLength={140}
                 onChange={(e) => setNote(e.target.value)}
@@ -181,8 +267,13 @@ export default function ItemSheet({ item, onClose, onConfirm }) {
               <Icon name="plus" size={16} strokeWidth={2.2} />
             </button>
           </div>
-          <button type="button" className="btn btn--primary" onClick={confirm}>
-            Agregar {money(unitPrice * qty)}
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={confirm}
+            disabled={faltan.length > 0}
+          >
+            {faltan.length > 0 ? 'Elegí una opción para agregar' : `Agregar ${money(unitPrice * qty)}`}
           </button>
         </div>
       </div>

@@ -163,6 +163,14 @@ export const borrarGrupo = (id) =>
 
 /* --- promos y cupones ---------------------------------------------- */
 
+export function subirFotoPromo(id, archivo) {
+  const form = new FormData()
+  form.append('foto', archivo)
+  return pedir(`/admin/promos/${id}/foto`, { method: 'POST', form })
+}
+
+export const quitarFotoPromo = (id) => pedir(`/admin/promos/${id}/foto`, { method: 'DELETE' })
+
 export const guardarPromo = (id, datos) =>
   id
     ? pedir(`/admin/promos/${id}`, { method: 'PUT', body: datos })
@@ -176,3 +184,19 @@ export const guardarCupon = (id, datos) =>
     : pedir('/admin/coupons', { method: 'POST', body: datos })
 
 export const borrarCupon = (id) => pedir(`/admin/coupons/${id}`, { method: 'DELETE' })
+
+/* --- pedidos ------------------------------------------------------- */
+
+export function listarPedidos({ vista, dia, q }) {
+  const qs = new URLSearchParams({ vista })
+  if (dia) qs.set('dia', dia)
+  if (q) qs.set('q', q)
+  return pedir(`/admin/orders?${qs}`)
+}
+
+export const verPedido = (id) => pedir(`/admin/orders/${encodeURIComponent(id)}`)
+
+export const cambiarEstadoPedido = (id, status, note = '') =>
+  pedir(`/admin/orders/${encodeURIComponent(id)}/estado`, { method: 'POST', body: { status, note } })
+
+export const estadisticas = (dias) => pedir(`/admin/stats?dias=${dias}`)

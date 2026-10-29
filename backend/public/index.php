@@ -9,6 +9,8 @@ declare(strict_types=1);
 use Foodix\Admin\AdminController;
 use Foodix\Admin\AdminRepository;
 use Foodix\Admin\Auth;
+use Foodix\Admin\EstadisticasRepository;
+use Foodix\Admin\PedidosController;
 use Foodix\Admin\Uploads;
 use Foodix\Menu\MenuController;
 use Foodix\Menu\MenuPresenter;
@@ -17,6 +19,8 @@ use Foodix\Order\OrderController;
 use Foodix\Order\OrderPresenter;
 use Foodix\Order\OrderRepository;
 use Foodix\Order\Pricing;
+use Foodix\Payment\Cobros;
+use Foodix\Payment\MercadoPago;
 use Foodix\Support\Database;
 use Foodix\Support\HttpException;
 use Foodix\Support\Response;
@@ -110,6 +114,17 @@ try {
     $router->post('/orders/{publicId}/pago-simulado', static function (array $p) use ($config): void {
         orderController($config)->fakePayment($p);
     });
+    $router->post('/orders/{publicId}/pagar', static function (array $p) use ($config): void {
+        orderController($config)->pagar($p);
+    });
+    $router->post('/orders/{publicId}/pago/sincronizar', static function (array $p) use ($config): void {
+        orderController($config)->sincronizarPago($p);
+    });
+
+    /* --- avisos de Mercado Pago ------------------------------------- */
+    $router->post('/webhooks/mercadopago', static function () use ($config): void {
+        orderController($config)->webhook($config['mercadopago']['webhook_secret']);
+    });
 
     $router->post('/t/{tenantSlug}/orders/quote', static function (array $p) use ($config): void {
         orderController($config)->quote($p);
@@ -122,6 +137,12 @@ try {
     });
     $router->post('/t/{tenantSlug}/orders/{publicId}/pago-simulado', static function (array $p) use ($config): void {
         orderController($config)->fakePayment($p);
+    });
+    $router->post('/t/{tenantSlug}/orders/{publicId}/pagar', static function (array $p) use ($config): void {
+        orderController($config)->pagar($p);
+    });
+    $router->post('/t/{tenantSlug}/orders/{publicId}/pago/sincronizar', static function (array $p) use ($config): void {
+        orderController($config)->sincronizarPago($p);
     });
 
     /* --- panel de administración ------------------------------------
@@ -201,6 +222,25 @@ try {
     $router->delete('/admin/promos/{id}', static function (array $p) use ($config): void {
         adminController($config)->borrarPromo($p);
     });
+    $router->get('/admin/stats', static function () use ($config): void {
+        pedidosController($config)->estadisticas();
+    });
+    $router->get('/admin/orders', static function () use ($config): void {
+        pedidosController($config)->listar();
+    });
+    $router->get('/admin/orders/{id}', static function (array $p) use ($config): void {
+        pedidosController($config)->mostrar($p);
+    });
+    $router->post('/admin/orders/{id}/estado', static function (array $p) use ($config): void {
+        pedidosController($config)->cambiarEstado($p);
+    });
+
+    $router->post('/admin/promos/{id}/foto', static function (array $p) use ($config): void {
+        adminController($config)->subirFotoPromo($p);
+    });
+    $router->delete('/admin/promos/{id}/foto', static function (array $p) use ($config): void {
+        adminController($config)->borrarFotoPromo($p);
+    });
 
     $router->post('/admin/coupons', static function () use ($config): void {
         adminController($config)->guardarCupon();
@@ -260,16 +300,38 @@ function adminController(array $config): AdminController
 }
 
 /** @param array<string, mixed> $config */
+function pedidosController(array $config): PedidosController
+{
+    $db = Database::connect($config['db']);
+
+    return new PedidosController(
+        new Auth($db),
+        new OrderRepository($db),
+        new OrderPresenter(),
+        new EstadisticasRepository($db),
+    );
+}
+
+/** @param array<string, mixed> $config */
 function orderController(array $config): OrderController
 {
     $db = Database::connect($config['db']);
 
+    $orders = new OrderRepository($db);
+    $mp = MercadoPago::desdeConfig($config['mercadopago']);
+
     return new OrderController(
         new MenuRepository($db),
-        new OrderRepository($db),
+        $orders,
         new OrderPresenter(),
         new Pricing($db),
         new TenantResolver($db, $config['default_tenant']),
-        $config['allow_fake_payments'],
+        // Con Mercado Pago conectado, el simulador se apaga solo: así las
+        // pruebas pasan por el cobro de verdad.
+        $config['allow_fake_payments'] && $mp === null,
+        $mp,
+        $mp === null ? null : new Cobros($orders, $mp),
+        $config['front_url'],
+        $config['api_public_url'] === '' ? null : $config['api_public_url'] . '/webhooks/mercadopago',
     );
 }

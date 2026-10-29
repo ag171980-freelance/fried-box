@@ -282,16 +282,6 @@ function Editor({ plato, alCerrar }) {
             )}
           </div>
 
-          {!f.image && (
-            <Selector
-              etiqueta="Dibujo mientras no haya foto"
-              ayuda="Un plato sin foto se dibuja por vector en vez de quedar con un hueco gris."
-              valor={f.artShape || 'tabla'}
-              alCambiar={set('artShape')}
-              opciones={datos.catalogo.artShapes.map((s) => ({ valor: s, texto: s }))}
-            />
-          )}
-
           <Casilleros
             etiqueta="Etiquetas"
             opciones={ETIQUETAS}

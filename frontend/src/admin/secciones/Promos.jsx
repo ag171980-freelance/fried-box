@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon.jsx'
+import { PROMO_IMAGE } from '../../brand.js'
 import * as api from '../api.js'
-import { Alerta, Area, Interruptor, Numero, Selector, Texto, Vacio } from '../Campos.jsx'
+import { Alerta, Area, Casilleros, Interruptor, Numero, Selector, Texto, Vacio } from '../Campos.jsx'
 import { useAccion, usePanel } from '../PanelProvider.jsx'
 
 const promoVacia = () => ({
@@ -10,9 +11,43 @@ const promoVacia = () => ({
   title: '',
   body: '',
   productId: null,
+  discountPercent: '',
+  days: [],
+  appliesTo: 'todo',
+  categoryIds: [],
+  productIds: [],
   isActive: true,
   sortOrder: 999,
 })
+
+const DIAS = [
+  { valor: 'lun', texto: 'Lunes' },
+  { valor: 'mar', texto: 'Martes' },
+  { valor: 'mie', texto: 'Miércoles' },
+  { valor: 'jue', texto: 'Jueves' },
+  { valor: 'vie', texto: 'Viernes' },
+  { valor: 'sab', texto: 'Sábado' },
+  { valor: 'dom', texto: 'Domingo' },
+]
+
+/** «15% · Lunes y jueves · Wings Box», para la fila de la lista. */
+function reglas(p, datos) {
+  if (!p.discountPercent) return 'Sólo aviso, no descuenta'
+
+  const dias = p.days.length
+    ? p.days.map((d) => DIAS.find((x) => x.valor === d)?.texto).join(', ')
+    : 'Todos los días'
+  const nombres = (ids, lista) =>
+    ids.map((id) => lista.find((x) => x.id === id)?.name).filter(Boolean).join(', ')
+  const alcance =
+    p.appliesTo === 'rubros'
+      ? nombres(p.categoryIds, datos.categories)
+      : p.appliesTo === 'platos'
+        ? nombres(p.productIds, datos.products)
+        : 'Toda la carta'
+
+  return `${p.discountPercent}% · ${dias} · ${alcance}`
+}
 
 const cuponVacio = () => ({
   id: null,
@@ -26,7 +61,7 @@ const cuponVacio = () => ({
 })
 
 /**
- * Las dos franjas de arriba de la carta y los códigos de descuento.
+ * Las promos de la carta y los códigos de descuento.
  *
  * Van juntos en una pantalla porque son la misma idea desde el lado del
  * local: las dos formas que tiene de empujar una venta.
@@ -64,7 +99,7 @@ function ListaPromos({ alEditar, alCrear }) {
       </h2>
 
       {datos.promos.length === 0 ? (
-        <Vacio titulo="Sin promos" texto="Las promos son las franjas de color arriba de la carta." />
+        <Vacio titulo="Sin promos" texto="Las promos aparecen en un aviso al entrar a la carta y en su propia sección, arriba de todo." />
       ) : (
         <ul className="ad-lista">
           {datos.promos.map((p) => (
@@ -73,6 +108,7 @@ function ListaPromos({ alEditar, alCrear }) {
                 {p.kicker && <p className="ad-fila__kicker">{p.kicker}</p>}
                 <p className="ad-fila__nombre">{p.title}</p>
                 {p.body && <p className="ad-fila__desc">{p.body}</p>}
+                <p className="ad-fila__desc">{reglas(p, datos)}</p>
                 {p.productName && <p className="ad-fila__desc">Lleva a: {p.productName}</p>}
               </div>
               <span className={'ad-pastilla' + (p.isActive ? ' is-si' : ' is-no')}>
@@ -139,10 +175,42 @@ function ListaCupones({ alEditar, alCrear }) {
 }
 
 function EditorPromo({ promo, alCerrar }) {
-  const { datos } = usePanel()
+  const { datos, aplicar } = usePanel()
   const { correr, ocupado, error } = useAccion()
   const [f, setF] = useState(promo)
+  const [subiendo, setSubiendo] = useState(false)
+  const [errorFoto, setErrorFoto] = useState(null)
+  const archivo = useRef(null)
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }))
+
+  async function subirFoto(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setSubiendo(true)
+    setErrorFoto(null)
+    try {
+      const res = await api.subirFotoPromo(f.id, file)
+      setF((x) => ({ ...x, image: res.image }))
+      aplicar({ promos: res.promos })
+    } catch (err) {
+      setErrorFoto(err)
+    } finally {
+      setSubiendo(false)
+      if (archivo.current) archivo.current.value = ''
+    }
+  }
+
+  async function quitarFoto() {
+    setErrorFoto(null)
+    try {
+      const res = await api.quitarFotoPromo(f.id)
+      setF((x) => ({ ...x, image: null }))
+      aplicar({ promos: res.promos })
+    } catch (err) {
+      setErrorFoto(err)
+    }
+  }
 
   async function guardar(e) {
     e.preventDefault()
@@ -152,6 +220,11 @@ function EditorPromo({ promo, alCerrar }) {
         title: f.title,
         body: f.body,
         productId: f.productId ? Number(f.productId) : null,
+        discountPercent: Number(f.discountPercent) || null,
+        days: f.days,
+        appliesTo: f.appliesTo,
+        categoryIds: f.categoryIds,
+        productIds: f.productIds,
         isActive: f.isActive,
         sortOrder: Number(f.sortOrder) || 999,
       }),
@@ -182,9 +255,106 @@ function EditorPromo({ promo, alCerrar }) {
           <Texto etiqueta="Título" valor={f.title} alCambiar={set('title')} required maxLength={160} />
           <Area etiqueta="Texto" valor={f.body} alCambiar={set('body')} maxLength={300} />
 
+          {/* Igual que la foto de un plato: necesita un id para nombrar
+              el archivo, así que sólo se sube a una promo ya guardada. */}
+          <div className="ad-campo">
+            <span className="ad-campo__label">Imagen</span>
+
+            {!f.id ? (
+              <p className="ad-campo__ayuda">
+                Guardá la promo primero y después vas a poder subirle una imagen. Mientras
+                tanto usa la imagen genérica.
+              </p>
+            ) : (
+              <div className="ad-foto">
+                <div className="ad-foto__vista">
+                  <img src={f.image || PROMO_IMAGE} alt={`Imagen de ${f.title}`} />
+                </div>
+
+                <div className="ad-foto__acciones">
+                  <input
+                    ref={archivo}
+                    id="foto-promo"
+                    className="ad-foto__input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={subirFoto}
+                  />
+                  <label htmlFor="foto-promo" className="ad-btn ad-btn--fantasma">
+                    <Icon name="upload" size={18} />
+                    {subiendo ? 'Subiendo...' : f.image ? 'Cambiar' : 'Subir imagen'}
+                  </label>
+
+                  {f.image && (
+                    <button type="button" className="ad-btn ad-btn--fantasma" onClick={quitarFoto}>
+                      Usar la genérica
+                    </button>
+                  )}
+
+                  <p className="ad-campo__ayuda">
+                    {f.image ? '' : 'Ahora muestra la imagen genérica. '}
+                    JPG, PNG o WebP, hasta 6 MB. Se ve apaisada (2:1).
+                  </p>
+                  <Alerta error={errorFoto} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Numero
+            etiqueta="Descuento"
+            ayuda="Se descuenta solo en el pedido. Dejalo vacío si la promo es sólo un aviso."
+            valor={f.discountPercent ?? ''}
+            alCambiar={set('discountPercent')}
+            sufijo="%"
+            min="0"
+            max="100"
+            step="any"
+          />
+
+          {Number(f.discountPercent) > 0 && (
+            <>
+              <Casilleros
+                etiqueta="Qué días (sin marcar ninguno, todos)"
+                opciones={DIAS}
+                valores={f.days}
+                alCambiar={set('days')}
+              />
+
+              <Selector
+                etiqueta="Qué platos entran"
+                valor={f.appliesTo}
+                alCambiar={set('appliesTo')}
+                opciones={[
+                  { valor: 'todo', texto: 'Toda la carta' },
+                  { valor: 'rubros', texto: 'Algunos rubros' },
+                  { valor: 'platos', texto: 'Algunos platos' },
+                ]}
+              />
+
+              {f.appliesTo === 'rubros' && (
+                <Casilleros
+                  etiqueta="Rubros"
+                  opciones={datos.categories.map((c) => ({ valor: c.id, texto: c.name }))}
+                  valores={f.categoryIds}
+                  alCambiar={set('categoryIds')}
+                />
+              )}
+
+              {f.appliesTo === 'platos' && (
+                <Casilleros
+                  etiqueta="Platos"
+                  opciones={datos.products.map((p) => ({ valor: p.id, texto: p.name }))}
+                  valores={f.productIds}
+                  alCambiar={set('productIds')}
+                />
+              )}
+            </>
+          )}
+
           <Selector
             etiqueta="A qué plato lleva"
-            ayuda="Al tocar la franja se abre este plato."
+            ayuda="Al tocar la promo se abre este plato."
             valor={f.productId ? String(f.productId) : ''}
             alCambiar={(v) => set('productId')(v || null)}
             opciones={[

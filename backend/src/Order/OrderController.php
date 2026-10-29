@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Foodix\Order;
 
 use Foodix\Menu\MenuRepository;
+use Foodix\Payment\Cobros;
+use Foodix\Payment\MercadoPago;
 use Foodix\Support\HttpException;
 use Foodix\Support\Request;
 use Foodix\Support\Response;
@@ -12,7 +14,7 @@ use Foodix\Tenant\TenantResolver;
 
 final class OrderController
 {
-    private const METODOS_PAGO = ['mercadopago', 'efectivo', 'transferencia'];
+    private const METODOS_PAGO = ['mercadopago', 'efectivo'];
     private const MODOS = ['delivery', 'pickup'];
 
     public function __construct(
@@ -22,6 +24,10 @@ final class OrderController
         private readonly Pricing $pricing,
         private readonly TenantResolver $tenants,
         private readonly bool $permitirPagoSimulado,
+        private readonly ?MercadoPago $mp = null,
+        private readonly ?Cobros $cobros = null,
+        private readonly string $urlFront = '',
+        private readonly ?string $urlWebhook = null,
     ) {
     }
 
@@ -66,6 +72,12 @@ final class OrderController
 
         $mode = $req->enum('mode', self::MODOS, 'delivery');
         $paymentMethod = $req->enum('paymentMethod', self::METODOS_PAGO, 'mercadopago');
+
+        // Sin cuenta de Mercado Pago y sin simulador no hay cómo cobrar:
+        // se corta antes de crear un pedido que nadie va a poder pagar.
+        if ($paymentMethod === 'mercadopago' && $this->mp === null && !$this->permitirPagoSimulado) {
+            throw new HttpException(503, 'Por ahora este local no acepta Mercado Pago. Elegí efectivo.', 'mp_no_configurado');
+        }
         $customer = $req->obj('customer');
 
         $datos = [
@@ -130,18 +142,147 @@ final class OrderController
         $creado = $this->orders->create($tenant['id'], $menu['id'], $quote, $datos);
         $order = $this->presenter->order($this->orders->find($tenant['id'], $creado['publicId']));
 
-        // Cada local vive en su propio espacio de URLs: /foodix/pedido/…
-        $base = '/' . $tenant['slug'];
+        // El front sirve una sola marca desde la raíz, sin slug en la URL:
+        // /pedido/…, no /friedbox/pedido/…
+        $checkoutUrl = '/pedido/' . $creado['publicId'];
+        $pagoError = null;
+
+        if ($paymentMethod === 'mercadopago') {
+            try {
+                // Con Mercado Pago conectado es el link de pago: una
+                // dirección de otro dominio, y el navegador sale de la app.
+                $checkoutUrl = $this->linkDePago($tenant, $creado['publicId']);
+            } catch (HttpException $e) {
+                // El pedido ya existe. Si Mercado Pago no contestó, el
+                // cliente va a su pedido y paga desde ahí con «Ir a pagar».
+                $pagoError = $e->getMessage();
+            }
+        }
 
         Response::json([
             'order' => $order,
-            // Con Mercado Pago conectado, acá va el init_point de la
-            // preferencia: una dirección absoluta a otro dominio, y el
-            // navegador sale de la app en vez de navegar dentro.
-            'checkoutUrl' => $paymentMethod === 'mercadopago'
-                ? $base . '/pago-simulado/' . $creado['publicId']
-                : $base . '/pedido/' . $creado['publicId'],
+            'checkoutUrl' => $checkoutUrl,
+            'pagoError' => $pagoError,
         ], 201);
+    }
+
+    /**
+     * POST /orders/{publicId}/pagar
+     *
+     * Un link de pago nuevo para un pedido que todavía no se pagó: el
+     * cliente cerró la pestaña de Mercado Pago, o el pago fue rechazado.
+     *
+     * @param array<string,string> $params
+     */
+    public function pagar(array $params): void
+    {
+        $tenant = $this->tenants->find($this->tenants->resolveSlug($params['tenantSlug'] ?? null));
+        $publicId = self::publicId($params);
+        $order = $this->orders->find($tenant['id'], $publicId);
+
+        if ($order['payment_method'] !== 'mercadopago'
+            || !in_array($order['status'], ['pendiente_de_pago', 'pago_rechazado'], true)) {
+            throw new HttpException(409, 'Este pedido ya no está esperando el pago.', 'pedido_sin_pago_pendiente');
+        }
+
+        Response::json(['checkoutUrl' => $this->linkDePago($tenant, $publicId)]);
+    }
+
+    /**
+     * POST /orders/{publicId}/pago/sincronizar
+     *
+     * Le pregunta a Mercado Pago cómo salió el pago y actualiza el
+     * pedido. Es lo que confirma el pago en local, donde el webhook no
+     * puede llegar, y el respaldo en producción si el webhook se demora.
+     * Devuelve el pedido como queda.
+     *
+     * @param array<string,string> $params
+     */
+    public function sincronizarPago(array $params): void
+    {
+        $tenant = $this->tenants->find($this->tenants->resolveSlug($params['tenantSlug'] ?? null));
+        $publicId = self::publicId($params);
+        $order = $this->orders->find($tenant['id'], $publicId);
+
+        $pagoError = null;
+        if ($this->cobros !== null
+            && $order['payment_method'] === 'mercadopago'
+            && in_array($order['status'], ['pendiente_de_pago', 'pago_rechazado'], true)) {
+            try {
+                $this->cobros->sincronizar($publicId);
+                $order = $this->orders->find($tenant['id'], $publicId);
+            } catch (HttpException $e) {
+                // Si Mercado Pago no contesta, se muestra el pedido como
+                // estaba: el próximo intento lo resuelve.
+                $pagoError = $e->getMessage();
+            }
+        }
+
+        Response::json(['order' => $this->presenter->order($order), 'pagoError' => $pagoError]);
+    }
+
+    /**
+     * POST /webhooks/mercadopago
+     *
+     * El aviso de Mercado Pago de que un pago cambió. Trae sólo el id: el
+     * pago se pide a la API con el token del local y recién ahí se
+     * aplica. Si hay clave secreta configurada, además se valida la firma.
+     *
+     * Siempre contesta rápido: si tarda o falla, Mercado Pago reintenta.
+     */
+    public function webhook(string $secreto): void
+    {
+        if ($this->cobros === null) {
+            Response::json(['ok' => false, 'motivo' => 'Mercado Pago no está configurado.']);
+            return;
+        }
+
+        $cuerpo = json_decode((string) file_get_contents('php://input'), true);
+        $cuerpo = is_array($cuerpo) ? $cuerpo : [];
+
+        // Dos formatos conviven: el webhook nuevo ({ type, data: { id } }
+        // y ?data.id=) y el IPN viejo (?topic=payment&id=). PHP convierte
+        // el punto de «data.id» en guion bajo.
+        $tipo = (string) ($cuerpo['type'] ?? $_GET['type'] ?? $_GET['topic'] ?? '');
+        $id = (string) ($_GET['data_id'] ?? $cuerpo['data']['id'] ?? $_GET['id'] ?? '');
+
+        if ($tipo !== 'payment' || $id === '') {
+            Response::json(['ok' => true, 'ignorado' => true]);
+            return;
+        }
+
+        if ($secreto !== '' && !MercadoPago::firmaValida(
+            (string) ($_SERVER['HTTP_X_SIGNATURE'] ?? ''),
+            (string) ($_SERVER['HTTP_X_REQUEST_ID'] ?? ''),
+            $id,
+            $secreto,
+        )) {
+            throw new HttpException(401, 'Firma inválida.', 'mp_firma_invalida');
+        }
+
+        $this->cobros->aplicarPorId($id);
+
+        Response::json(['ok' => true]);
+    }
+
+    /** @param array{id:int,slug:string,name:string} $tenant */
+    private function linkDePago(array $tenant, string $publicId): string
+    {
+        if ($this->mp === null) {
+            if (!$this->permitirPagoSimulado) {
+                throw new HttpException(503, 'Por ahora este local no acepta Mercado Pago.', 'mp_no_configurado');
+            }
+            return '/pago-simulado/' . $publicId;
+        }
+
+        $order = $this->orders->find($tenant['id'], $publicId);
+
+        return $this->mp->crearPreferencia(
+            $order,
+            (string) $tenant['name'],
+            $this->urlFront,
+            $this->urlWebhook,
+        )['url'];
     }
 
     /**

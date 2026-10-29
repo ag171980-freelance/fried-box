@@ -4,7 +4,8 @@ import * as api from './api.js'
 import { useAccion, usePanel } from './PanelProvider.jsx'
 
 const SECCIONES = [
-  { a: '/admin', icono: 'list', texto: 'Carta', exacto: true },
+  { a: '/admin', icono: 'bag', texto: 'Pedidos', exacto: true },
+  { a: '/admin/carta', icono: 'list', texto: 'Carta' },
   { a: '/admin/rubros', icono: 'tag', texto: 'Rubros' },
   { a: '/admin/opciones', icono: 'sliders', texto: 'Opciones' },
   { a: '/admin/promos', icono: 'ticket', texto: 'Promos' },

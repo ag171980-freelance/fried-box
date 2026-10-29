@@ -382,6 +382,8 @@ span.ad-pastilla { cursor: default; }
 .ad-campo input[type='email'],
 .ad-campo input[type='password'],
 .ad-campo input[type='number'],
+.ad-campo input[type='date'],
+.ad-campo input[type='search'],
 .ad-campo textarea,
 .ad-campo select,
 .ad-eleccion input[type='text'],
@@ -533,6 +535,7 @@ span.ad-pastilla { cursor: default; }
 .ad-elecciones { list-style: none; margin: 0 0 var(--s3); padding: 0; }
 .ad-eleccion {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
   margin-bottom: var(--s2);
@@ -783,3 +786,260 @@ span.ad-pastilla { cursor: default; }
   .ad-top { flex-wrap: wrap; }
   .ad-top__marca { flex-basis: 100%; }
 }
+
+/* --- Pedidos -------------------------------------------------------
+   La pantalla que queda abierta en el mostrador. Tarjetas y no filas:
+   se leen de lejos y cada una tiene su botón grande para el paso que
+   sigue.
+   ------------------------------------------------------------------ */
+
+.ad-tabs {
+  display: flex;
+  gap: var(--s1);
+  margin-bottom: var(--s5);
+  border-bottom: 1px solid var(--ad-linea);
+}
+.ad-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3) 10px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.ad-tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--brand); }
+.ad-tab__cuenta {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-align: center;
+}
+
+.ad-pedidos__barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s5);
+}
+.ad-pedidos__vivo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--ink-3);
+  font-size: var(--t-sm);
+}
+.ad-pedidos__vivo i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: ad-latido 2s ease-in-out infinite;
+}
+@keyframes ad-latido { 50% { opacity: 0.3; } }
+.ad-pedidos__cargando { padding: var(--s8) 0; color: var(--ink-3); text-align: center; }
+
+.ad-pedidos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s3);
+}
+
+.ad-pedido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4);
+  border: 1px solid var(--ad-linea);
+  border-radius: var(--ad-r);
+  background: var(--surface);
+}
+/* Recién llegado: borde de marca hasta que alguien lo mueve. */
+.ad-pedido.is-nuevo {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
+  animation: ad-llega 0.6s var(--ease-out);
+}
+@keyframes ad-llega { from { transform: scale(0.97); } }
+
+.ad-pedido__top { display: flex; align-items: center; gap: var(--s2); }
+.ad-pedido__num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--t-lg);
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.ad-pedido__hora { color: var(--ink-3); font-size: var(--t-sm); margin-right: auto; }
+.ad-pedido__modo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  font-size: var(--t-xs);
+  font-weight: 600;
+}
+.ad-pedido__modo.is-envio { background: var(--accent); color: var(--accent-ink); }
+
+.ad-pedido__cliente { margin: 0; font-weight: 600; }
+.ad-pedido__dir { margin: -4px 0 0; color: var(--ink-2); font-size: var(--t-sm); }
+
+.ad-pedido__items {
+  list-style: none;
+  margin: 0;
+  padding: var(--s2) 0;
+  border-block: 1px dashed var(--ad-linea);
+  display: grid;
+  gap: var(--s2);
+}
+.ad-pedido__ops,
+.ad-pedido__nota {
+  display: block;
+  margin-left: 1.6em;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.ad-pedido__nota { font-style: italic; }
+.ad-pedido__aviso {
+  margin: 0;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--ad-r);
+  background: var(--brand-wash);
+  font-size: var(--t-sm);
+}
+.ad-pedido__pago {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--ink-2);
+}
+.ad-pedido__pago b { color: var(--ink); font-family: var(--font-mono); }
+
+.ad-pedido__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: auto;
+  padding-top: var(--s2);
+}
+.ad-pedido__acciones .ad-btn--primario { flex: 1; justify-content: center; }
+.ad-pedido__cancelar { color: var(--danger); }
+
+/* Historial */
+.ad-pedidos__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+.ad-pedidos__filtros .ad-campo { margin: 0; }
+.ad-pedidos__dia { flex: 0 0 180px; }
+.ad-pedidos__buscar { flex: 1 1 220px; }
+
+.ad-resumen {
+  display: grid;
+  /* Dos por fila en el celular, cuatro en pantalla ancha: con tres, el
+     monto del mes no entra en una línea. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  margin: 0 0 var(--s5);
+}
+.ad-resumen > div {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--ad-linea);
+  border-radius: var(--ad-r);
+  background: var(--surface);
+}
+.ad-resumen dt { color: var(--ink-3); font-size: var(--t-xs); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.ad-resumen dd {
+  margin: 4px 0 0;
+  font-size: clamp(1.125rem, 4.6vw, var(--t-lg));
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+@media (min-width: 720px) {
+  .ad-resumen { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.ad-resumen__sub { margin: 2px 0 0; color: var(--ink-3); font-size: var(--t-sm); }
+
+.ad-fila--pedido {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+.ad-fila--pedido:hover .ad-fila__nombre { color: var(--brand); }
+
+/* Detalle */
+.ad-det__linea { margin: 0 0 var(--s2); }
+.ad-det__linea a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.ad-det__items { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; gap: var(--s3); }
+.ad-det__items li { display: flex; justify-content: space-between; gap: var(--s3); }
+.ad-det__sumas { margin: 0 0 var(--s3); display: grid; gap: 4px; font-size: var(--t-sm); }
+.ad-det__sumas div { display: flex; justify-content: space-between; color: var(--ink-2); }
+.ad-det__sumas dd { margin: 0; font-family: var(--font-mono); }
+.ad-det__sumas .is-total { color: var(--ink); font-weight: 700; font-size: var(--t-base); padding-top: 4px; border-top: 1px solid var(--ad-linea); }
+.ad-det__eventos { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; gap: var(--s2); font-size: var(--t-sm); }
+.ad-det__eventos li { display: grid; grid-template-columns: 48px 1fr; gap: var(--s2); }
+.ad-det__fuente {
+  margin-left: var(--s2);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+
+/* --- Estadísticas -------------------------------------------------- */
+
+.ad-stats { margin-bottom: var(--s8); }
+.ad-stats .ad-resumen { margin-bottom: var(--s2); }
+.ad-stats__nota { margin: 0 0 var(--s5); color: var(--ink-3); font-size: var(--t-xs); }
+.ad-stats__vacio { padding: var(--s6) 0; color: var(--ink-3); text-align: center; }
+
+.ad-stats__rango { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
+.ad-chip-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+.ad-chip-btn[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+.ad-graficos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--s3);
+}
+.ad-grafico {
+  min-width: 0;
+  margin: 0;
+  padding: var(--s4);
+  border: 1px solid var(--ad-linea);
+  border-radius: var(--ad-r);
+  background: var(--surface);
+}
+.ad-grafico.is-ancho { grid-column: 1 / -1; }
+.ad-grafico__titulo { margin-bottom: var(--s3); font-weight: 600; }
+.ad-grafico__lienzo { position: relative; width: 100%; }
+
+.ad-grafico__tabla { margin-top: var(--s3); font-size: var(--t-sm); }
+.ad-grafico__tabla summary { cursor: pointer; color: var(--ink-2); }
+.ad-grafico__tabla table { width: 100%; margin-top: var(--s2); border-collapse: collapse; }
+.ad-grafico__tabla th,
+.ad-grafico__tabla td { padding: 4px 0; text-align: left; border-bottom: 1px solid var(--ad-linea); }
+.ad-grafico__tabla th { color: var(--ink-3); font-weight: 500; }
+.ad-grafico__tabla td + td,
+.ad-grafico__tabla th + th { text-align: right; font-family: var(--font-mono); }
+
+.ad-pedidos__deldia { margin-top: var(--s2); }

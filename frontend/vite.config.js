@@ -6,7 +6,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    base: './',
+    // Relativa sirve para colgar el build de una carpeta en XAMPP, pero
+    // con BrowserRouter rompe las rutas anidadas: al recargar
+    // /pedido/ord_… el navegador pide /pedido/assets/… En Netlify va '/'.
+    base: env.VITE_BASE || './',
     server: {
       port: 5173,
       proxy: {

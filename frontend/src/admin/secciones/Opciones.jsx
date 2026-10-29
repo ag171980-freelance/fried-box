@@ -13,7 +13,7 @@ const vacio = () => ({
   minChoices: 1,
   maxChoices: 1,
   sortOrder: 999,
-  choices: [{ name: '', priceDelta: 0, isDefault: true }],
+  choices: [{ name: '', priceDelta: 0, isDefault: true, isExclusive: false }],
 })
 
 /**
@@ -109,6 +109,7 @@ function EditorGrupo({ grupo, alCerrar }) {
           name: c.name,
           priceDelta: Number(c.priceDelta) || 0,
           isDefault: Boolean(c.isDefault),
+          isExclusive: f.type === 'multi' && Boolean(c.isExclusive),
         })),
       }),
     )
@@ -210,6 +211,19 @@ function EditorGrupo({ grupo, alCerrar }) {
                     />
                     Por defecto
                   </label>
+                  {f.type === 'multi' && (
+                    <label
+                      className="ad-eleccion__radio"
+                      title="No se combina con las otras: como «Sin salsas»."
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(c.isExclusive)}
+                        onChange={(e) => cambiarEleccion(i, { isExclusive: e.target.checked })}
+                      />
+                      Va sola
+                    </label>
+                  )}
                   <button
                     type="button"
                     className="ad-iconbtn"
@@ -227,7 +241,10 @@ function EditorGrupo({ grupo, alCerrar }) {
               type="button"
               className="ad-btn ad-btn--fantasma"
               onClick={() =>
-                setF((x) => ({ ...x, choices: [...x.choices, { name: '', priceDelta: 0, isDefault: false }] }))
+                setF((x) => ({
+                  ...x,
+                  choices: [...x.choices, { name: '', priceDelta: 0, isDefault: false, isExclusive: false }],
+                }))
               }
             >
               <Icon name="plus" size={18} />

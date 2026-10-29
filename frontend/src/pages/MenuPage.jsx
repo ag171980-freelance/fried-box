@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MenuBoard from '../components/menu/MenuBoard.jsx'
 import ItemSheet from '../components/menu/ItemSheet.jsx'
+import PromoModal, { PromoImage, PromoTag, promoSignature } from '../components/menu/PromoModal.jsx'
 import Ticket from '../components/cart/Ticket.jsx'
 import Topbar from '../components/Topbar.jsx'
 import Icon from '../components/ui/Icon.jsx'
@@ -10,6 +11,17 @@ import { useQuote } from '../lib/useQuote.js'
 import { useCart } from '../store/CartProvider.jsx'
 import { usePrefs } from '../store/PrefsProvider.jsx'
 import { useVenue } from '../store/VenueProvider.jsx'
+import { BRAND } from '../brand.js'
+
+const PROMOS_VISTAS = `foodix.promos.${BRAND}`
+
+function promosYaVistas(firma) {
+  try {
+    return sessionStorage.getItem(PROMOS_VISTAS) === firma
+  } catch {
+    return false
+  }
+}
 
 export default function MenuPage() {
   const cart = useCart()
@@ -21,6 +33,7 @@ export default function MenuPage() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [openItem, setOpenItem] = useState(null)
   const [activeCat, setActiveCat] = useState(null)
+  const [promosOpen, setPromosOpen] = useState(false)
 
   const sectionRefs = useRef({})
   const searchRef = useRef(null)
@@ -32,6 +45,30 @@ export default function MenuPage() {
     const found = wanted && menu.items.find((i) => i.id === wanted)
     if (found) setOpenItem(found)
   }, [menu.items])
+
+  /* Las promos se muestran al entrar, salvo que el enlace ya lleve a un
+     plato: ahí el cliente vino a otra cosa. */
+  useEffect(() => {
+    if (!menu.promos.length) return
+    if (new URLSearchParams(window.location.search).get('plato')) return
+    if (!promosYaVistas(promoSignature(menu.promos))) setPromosOpen(true)
+  }, [menu.promos])
+
+  const closePromos = () => {
+    setPromosOpen(false)
+    try {
+      sessionStorage.setItem(PROMOS_VISTAS, promoSignature(menu.promos))
+    } catch {
+      /* Sin storage la promo vuelve a salir al recargar. Nada más. */
+    }
+  }
+
+  const openPromo = (promo) => {
+    const target = menu.items.find((i) => i.id === promo.itemId)
+    if (target) setOpenItem(target)
+  }
+
+  const showPromoSection = menu.promos.length > 0 && !query.trim()
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus()
@@ -50,7 +87,7 @@ export default function MenuPage() {
     )
     Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el))
     return () => observer.disconnect()
-  }, [menu.items, prefs.layout, query])
+  }, [menu.items, menu.promos, prefs.layout, query])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -98,31 +135,6 @@ export default function MenuPage() {
         {menu.restaurant.name} · {menu.restaurant.tagline}
       </h1>
 
-      {menu.promos.length > 0 && (
-        <div className="marquee u-scroll-x enter-1" aria-label="Lo del día">
-          {menu.promos.map((promo) => {
-            const target = menu.items.find((i) => i.id === promo.itemId)
-            return (
-              <button
-                key={promo.id}
-                type="button"
-                className="promo"
-                onClick={() => target && setOpenItem(target)}
-              >
-                <span>
-                  <span className="promo__kicker u-mono">{promo.kicker}</span>
-                  <span className="promo__title">{promo.title}</span>
-                  <span className="promo__body">{promo.body}</span>
-                </span>
-                <span className="promo__go" aria-hidden="true">
-                  <Icon name="next" size={18} />
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {!menu.restaurant.isOpen && (
         <p className="cerrado enter-2" role="status">
           <b>Ahora estamos cerrados.</b>{' '}
@@ -157,6 +169,16 @@ export default function MenuPage() {
 
       <nav className="chips enter-2" aria-label="Rubros de la carta">
         <div className="chips__track u-scroll-x">
+          {showPromoSection && (
+            <button
+              type="button"
+              className="chip chip--promo"
+              aria-current={activeCat === 'promos'}
+              onClick={() => goToCat('promos')}
+            >
+              Promos
+            </button>
+          )}
           {visibleCats.map((cat) => (
             <button
               key={cat.id}
@@ -189,6 +211,46 @@ export default function MenuPage() {
 
       <div className="layout">
         <main className="main u-page">
+          {showPromoSection && (
+            <section
+              id="rubro-promos"
+              className="section"
+              ref={(el) => {
+                sectionRefs.current.promos = el
+              }}
+            >
+              <header className="section__head">
+                <h2 className="section__title">Promos</h2>
+              </header>
+              <div className="promogrid">
+                {menu.promos.map((promo) => (
+                  <button
+                    key={promo.id}
+                    type="button"
+                    className="promo promo--card"
+                    onClick={() => openPromo(promo)}
+                    disabled={!promo.itemId}
+                  >
+                    <PromoImage promo={promo} className="promo__img" />
+                    <span className="promo__content">
+                      <span>
+                        <PromoTag promo={promo} />
+                        {promo.kicker && <span className="promo__kicker u-mono">{promo.kicker}</span>}
+                        <span className="promo__title">{promo.title}</span>
+                        {promo.body && <span className="promo__body">{promo.body}</span>}
+                      </span>
+                      {promo.itemId && (
+                        <span className="promo__go" aria-hidden="true">
+                          <Icon name="next" size={18} />
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {visibleCats.length === 0 ? (
             query.trim() ? (
               <div className="empty">
@@ -279,6 +341,17 @@ export default function MenuPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {promosOpen && (
+        <PromoModal
+          promos={menu.promos}
+          onClose={closePromos}
+          onPick={(promo) => {
+            closePromos()
+            openPromo(promo)
+          }}
+        />
       )}
 
       {openItem && (

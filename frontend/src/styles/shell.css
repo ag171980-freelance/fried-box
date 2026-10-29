@@ -79,28 +79,40 @@
   box-shadow: var(--shadow-1);
 }
 
-/* --- Franja del día ---------------------------------------------
-   Reemplaza a la portada grande: es lo que cambia todos los días y
-   además hace de único momento de color fuerte antes de la comida.
+/* --- Promos -----------------------------------------------------
+   Tarjetas en el color de la marca, primera sección de la carta. Es
+   el único momento de color fuerte antes de la comida.
    ------------------------------------------------------------- */
-.marquee {
-  scroll-snap-type: x mandatory;
-  background: var(--brand);
-  color: var(--brand-ink);
+.promogrid {
+  display: grid;
+  gap: var(--s3);
 }
 .promo {
-  scroll-snap-align: center;
-  flex: 0 0 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--brand);
+  color: var(--brand-ink);
+  transition: opacity var(--dur-1) var(--ease);
+}
+.promo:active { opacity: 0.8; }
+.promo__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.promo__content {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--s4);
-  text-align: left;
   padding: var(--s4);
-  color: inherit;
-  transition: opacity var(--dur-1) var(--ease);
 }
-.promo:active { opacity: 0.8; }
+.promo:disabled { cursor: default; opacity: 1; }
 .promo__kicker {
   display: block;
   /* Derivado del color de texto de la marca, no del acento: el acento no
@@ -109,6 +121,18 @@
   color: color-mix(in srgb, var(--brand-ink) 82%, transparent);
   margin-bottom: 4px;
 }
+.promo__tag {
+  display: inline-block;
+  margin-bottom: var(--s2);
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  background: var(--brand-ink);
+  color: var(--brand);
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.promo__tag.is-hoy { background: var(--accent); color: var(--accent-ink); }
 .promo__title {
   display: block;
   font-family: var(--font-display);
@@ -118,9 +142,13 @@
   letter-spacing: -0.035em;
   font-variation-settings: 'opsz' 24;
 }
-/* En el celular la franja se queda con el titular. La letra chica
-   aparece recién cuando hay ancho de sobra. */
-.promo__body { display: none; }
+.promo__body {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--t-sm);
+  opacity: 0.85;
+  max-width: 46ch;
+}
 .promo__go {
   display: grid;
   place-items: center;
@@ -131,16 +159,9 @@
 }
 
 @media (min-width: 720px) {
-  .promo { flex-basis: min(560px, 60%); padding: var(--s5) var(--s6); }
+  .promogrid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .promo__content { padding: var(--s5) var(--s6); }
   .promo__title { font-size: 1.5rem; }
-  .promo__body {
-    display: block;
-    margin-top: 5px;
-    font-size: var(--t-sm);
-    opacity: 0.8;
-    max-width: 46ch;
-  }
-  .marquee { padding-inline: max(0px, calc((100% - var(--page-max)) / 2)); }
 }
 
 /* --- Línea de datos --------------------------------------------- */
@@ -240,6 +261,8 @@
     border-color var(--dur-2) var(--ease);
 }
 .chip:hover { border-color: var(--line-strong); }
+.chip--promo { border-color: var(--brand); background: var(--brand); color: var(--brand-ink); font-weight: 600; }
+.chip--promo:hover { border-color: var(--brand-hover); }
 .chip[aria-current='true'] {
   background: var(--ink);
   border-color: var(--ink);

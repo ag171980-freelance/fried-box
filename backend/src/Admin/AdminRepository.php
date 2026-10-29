@@ -390,6 +390,7 @@ final class AdminRepository
                 'name' => $c['name'],
                 'priceDelta' => (float) $c['price_delta'],
                 'isDefault' => (bool) $c['is_default'],
+                'isExclusive' => (bool) $c['is_exclusive'],
                 'sortOrder' => (int) $c['sort_order'],
             ];
         }
@@ -468,6 +469,10 @@ final class AdminRepository
               ORDER BY pr.sort_order ASC, pr.id ASC',
         );
         $stmt->execute(['t' => $tenantId, 'm' => $menuId]);
+        $filas = $stmt->fetchAll();
+
+        $rubros = $this->idsPorPromo('promo_categories', 'category_id', $tenantId);
+        $platos = $this->idsPorPromo('promo_products', 'product_id', $tenantId);
 
         return array_map(static fn (array $r): array => [
             'id' => (int) $r['id'],
@@ -475,11 +480,41 @@ final class AdminRepository
             'kicker' => $r['kicker'],
             'title' => $r['title'],
             'body' => $r['body'],
+            'image' => $r['image_path'] ?: null,
             'productId' => $r['product_id'] === null ? null : (int) $r['product_id'],
             'productName' => $r['plato'],
+            'discountPercent' => $r['discount_percent'] === null ? null : (float) $r['discount_percent'],
+            'days' => $r['days'] === null || $r['days'] === '' ? [] : explode(',', $r['days']),
+            'appliesTo' => $r['applies_to'],
+            'categoryIds' => $rubros[(int) $r['id']] ?? [],
+            'productIds' => $platos[(int) $r['id']] ?? [],
             'isActive' => (bool) $r['is_active'],
             'sortOrder' => (int) $r['sort_order'],
-        ], $stmt->fetchAll());
+        ], $filas);
+    }
+
+    /**
+     * Los rubros o platos de cada promo del local.
+     *
+     * @return array<int, list<int>>
+     */
+    private function idsPorPromo(string $tabla, string $columna, int $tenantId): array
+    {
+        // $tabla y $columna nunca vienen del usuario: son literales de este archivo.
+        $stmt = $this->db->prepare(
+            "SELECT x.promo_id, x.`$columna` AS ref
+               FROM `$tabla` x
+               JOIN promos pr ON pr.id = x.promo_id
+              WHERE pr.tenant_id = :t",
+        );
+        $stmt->execute(['t' => $tenantId]);
+
+        $out = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $out[(int) $row['promo_id']][] = (int) $row['ref'];
+        }
+
+        return $out;
     }
 
     /** @param array<string,mixed> $d */
@@ -488,34 +523,84 @@ final class AdminRepository
         if ($d['productId'] !== null) {
             $this->exigirFila('products', $tenantId, (int) $d['productId'], 'El plato de la promo no existe.');
         }
-
-        if ($id === null) {
-            $slug = $this->slugLibre('promos', $menuId, Slug::de((string) $d['title']) ?: 'promo');
-
-            $this->db->prepare(
-                'INSERT INTO promos (tenant_id, menu_id, slug, kicker, title, body, product_id, is_active, sort_order)
-                 VALUES (:t, :m, :s, :k, :ti, :b, :p, :act, :orden)',
-            )->execute([
-                't' => $tenantId, 'm' => $menuId, 's' => $slug, 'k' => $d['kicker'],
-                'ti' => $d['title'], 'b' => $d['body'], 'p' => $d['productId'],
-                'act' => $d['isActive'] ? 1 : 0, 'orden' => $d['sortOrder'],
-            ]);
-
-            return (int) $this->db->lastInsertId();
+        foreach ($d['categoryIds'] as $categoryId) {
+            $this->exigirCategoria($tenantId, $menuId, $categoryId);
+        }
+        foreach ($d['productIds'] as $productId) {
+            $this->exigirFila('products', $tenantId, $productId, 'Uno de los platos de la promo no existe.');
         }
 
-        $this->exigirFila('promos', $tenantId, $id, 'La promo no existe.');
-
-        $this->db->prepare(
-            'UPDATE promos SET kicker = :k, title = :ti, body = :b, product_id = :p,
-                               is_active = :act, sort_order = :orden
-              WHERE id = :id AND tenant_id = :t',
-        )->execute([
+        $valores = [
             'k' => $d['kicker'], 'ti' => $d['title'], 'b' => $d['body'], 'p' => $d['productId'],
-            'act' => $d['isActive'] ? 1 : 0, 'orden' => $d['sortOrder'], 'id' => $id, 't' => $tenantId,
-        ]);
+            'pct' => $d['discountPercent'], 'dias' => $d['days'], 'alc' => $d['appliesTo'],
+            'act' => $d['isActive'] ? 1 : 0, 'orden' => $d['sortOrder'],
+        ];
+
+        $this->db->beginTransaction();
+        try {
+            if ($id === null) {
+                $slug = $this->slugLibre('promos', $menuId, Slug::de((string) $d['title']) ?: 'promo');
+
+                $this->db->prepare(
+                    'INSERT INTO promos (tenant_id, menu_id, slug, kicker, title, body, product_id,
+                                         discount_percent, days, applies_to, is_active, sort_order)
+                     VALUES (:t, :m, :s, :k, :ti, :b, :p, :pct, :dias, :alc, :act, :orden)',
+                )->execute(['t' => $tenantId, 'm' => $menuId, 's' => $slug] + $valores);
+
+                $id = (int) $this->db->lastInsertId();
+            } else {
+                $this->exigirFila('promos', $tenantId, $id, 'La promo no existe.');
+
+                $this->db->prepare(
+                    'UPDATE promos SET kicker = :k, title = :ti, body = :b, product_id = :p,
+                                       discount_percent = :pct, days = :dias, applies_to = :alc,
+                                       is_active = :act, sort_order = :orden
+                      WHERE id = :id AND tenant_id = :t',
+                )->execute(['id' => $id, 't' => $tenantId] + $valores);
+            }
+
+            // Lo que abarca se reemplaza entero: es más simple que calcular
+            // qué se agregó y qué se sacó, y son pocas filas.
+            $this->db->prepare('DELETE FROM promo_categories WHERE promo_id = :id')->execute(['id' => $id]);
+            $this->db->prepare('DELETE FROM promo_products WHERE promo_id = :id')->execute(['id' => $id]);
+
+            $insRubro = $this->db->prepare('INSERT INTO promo_categories (promo_id, category_id) VALUES (:id, :ref)');
+            foreach ($d['categoryIds'] as $ref) {
+                $insRubro->execute(['id' => $id, 'ref' => $ref]);
+            }
+            $insPlato = $this->db->prepare('INSERT INTO promo_products (promo_id, product_id) VALUES (:id, :ref)');
+            foreach ($d['productIds'] as $ref) {
+                $insPlato->execute(['id' => $id, 'ref' => $ref]);
+            }
+
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
 
         return $id;
+    }
+
+    /**
+     * La imagen actual de la promo. Tira 404 si la promo no es del local,
+     * así que sirve también para validar antes de subir.
+     */
+    public function fotoPromo(int $tenantId, int $id): ?string
+    {
+        $this->exigirFila('promos', $tenantId, $id, 'La promo no existe.');
+
+        $stmt = $this->db->prepare('SELECT image_path FROM promos WHERE id = :id AND tenant_id = :t');
+        $stmt->execute(['id' => $id, 't' => $tenantId]);
+        $ruta = $stmt->fetchColumn();
+
+        return $ruta === false || $ruta === null || $ruta === '' ? null : (string) $ruta;
+    }
+
+    public function guardarFotoPromo(int $tenantId, int $id, ?string $ruta): void
+    {
+        $this->db->prepare('UPDATE promos SET image_path = :r WHERE id = :id AND tenant_id = :t')
+            ->execute(['r' => $ruta, 'id' => $id, 't' => $tenantId]);
     }
 
     public function borrarPromo(int $tenantId, int $id): void
@@ -705,8 +790,8 @@ final class AdminRepository
 
         $stmt = $this->db->prepare(
             'INSERT INTO option_choices
-               (tenant_id, option_group_id, slug, name, price_delta, is_default, sort_order)
-             VALUES (:t, :g, :s, :n, :p, :def, :orden)',
+               (tenant_id, option_group_id, slug, name, price_delta, is_default, is_exclusive, sort_order)
+             VALUES (:t, :g, :s, :n, :p, :def, :sola, :orden)',
         );
 
         $usados = [];
@@ -729,6 +814,7 @@ final class AdminRepository
                 'n' => $c['name'],
                 'p' => $c['priceDelta'],
                 'def' => $c['isDefault'] ? 1 : 0,
+                'sola' => $c['isExclusive'] ? 1 : 0,
                 'orden' => $orden,
             ]);
 

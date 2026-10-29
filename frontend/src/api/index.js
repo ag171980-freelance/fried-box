@@ -91,6 +91,25 @@ export async function getOrder(id, tenant) {
 }
 
 /**
+ * Le pregunta al backend cómo salió el pago, y el backend a Mercado Pago.
+ * Devuelve el pedido como queda. Es lo que confirma el pago al volver de
+ * Mercado Pago (en local el webhook no llega nunca).
+ */
+export async function syncPayment(id, tenant) {
+  const data = await request(`/orders/${encodeURIComponent(id)}/pago/sincronizar`, {
+    method: 'POST',
+    tenant,
+  })
+  return data.order
+}
+
+/** Un link de pago nuevo para un pedido que todavía no se pagó. */
+export async function payOrder(id, tenant) {
+  const data = await request(`/orders/${encodeURIComponent(id)}/pagar`, { method: 'POST', tenant })
+  return data.checkoutUrl
+}
+
+/**
  * Cierra el pago sin pasarela. Es el reemplazo del webhook de Mercado
  * Pago hasta que existan las credenciales; el backend lo rechaza con 403
  * si ALLOW_FAKE_PAYMENTS está en false.

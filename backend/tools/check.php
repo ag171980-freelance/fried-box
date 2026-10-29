@@ -177,7 +177,41 @@ foreach ($locales as $fila) {
 $pedidos = (int) $db->query('SELECT COUNT(*) FROM orders')->fetchColumn();
 echo sprintf('  info   pedidos guardados: %d%s', $pedidos, PHP_EOL);
 
-if ($config['allow_fake_payments']) {
+echo str_repeat('-', 60) . PHP_EOL;
+
+$mp = \Foodix\Payment\MercadoPago::desdeConfig($config['mercadopago']);
+if ($mp === null) {
+    echo '  aviso  Mercado Pago sin conectar (MP_ACCESS_TOKEN vacío).' . PHP_EOL;
+    echo $config['allow_fake_payments']
+        ? '         Los pagos con Mercado Pago van al cobro simulado.' . PHP_EOL
+        : '         Con ALLOW_FAKE_PAYMENTS en false, el checkout no ofrece cómo cobrar.' . PHP_EOL;
+} else {
+    try {
+        $cuenta = $mp->cuenta();
+        $decir(
+            true,
+            'Mercado Pago responde',
+            sprintf(
+                '%s · cuenta %s%s',
+                $mp->esPrueba() ? 'token de PRUEBA' : 'token de PRODUCCIÓN',
+                $cuenta['nickname'] ?? $cuenta['id'] ?? '?',
+                isset($cuenta['site_id']) ? ' (' . $cuenta['site_id'] . ')' : '',
+            ),
+        );
+    } catch (Throwable $e) {
+        $decir(false, 'Mercado Pago responde', $e->getMessage());
+    }
+
+    echo $config['api_public_url'] === ''
+        ? '  info   sin API_PUBLIC_URL: no hay webhook. Los pagos se confirman' . PHP_EOL
+            . '         cuando el cliente vuelve a la pantalla de su pedido.' . PHP_EOL
+        : '  info   webhook en ' . $config['api_public_url'] . '/webhooks/mercadopago' . PHP_EOL;
+    if ($config['mercadopago']['webhook_secret'] === '' && $config['api_public_url'] !== '') {
+        echo '  aviso  sin MP_WEBHOOK_SECRET: los avisos no se validan por firma.' . PHP_EOL;
+    }
+}
+
+if ($config['allow_fake_payments'] && $mp === null) {
     echo '  aviso  ALLOW_FAKE_PAYMENTS está en true: hay un endpoint que da'
         . PHP_EOL . '         pedidos por pagados sin pasarela. En producción, false.' . PHP_EOL;
 }

@@ -4,6 +4,7 @@ import FoodLoader from '../components/ui/FoodLoader.jsx'
 import AdminShell from './AdminShell.jsx'
 import LoginPage from './LoginPage.jsx'
 import { PanelProvider, usePanel } from './PanelProvider.jsx'
+import Pedidos from './secciones/Pedidos.jsx'
 import Carta from './secciones/Carta.jsx'
 import Local from './secciones/Local.jsx'
 import Opciones from './secciones/Opciones.jsx'
@@ -69,7 +70,8 @@ function Compuerta({ onSalir }) {
   return (
     <AdminShell onSalir={onSalir}>
       <Routes>
-        <Route path="/" element={<Carta />} />
+        <Route path="/" element={<Pedidos />} />
+        <Route path="/carta" element={<Carta />} />
         <Route path="/rubros" element={<Rubros />} />
         <Route path="/opciones" element={<Opciones />} />
         <Route path="/promos" element={<Promos />} />

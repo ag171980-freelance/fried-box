@@ -19,15 +19,12 @@ const PAYMENTS = [
   },
   {
     id: 'efectivo',
-    name: 'Efectivo al recibir',
-    desc: 'Avisanos con cuánto pagás así el repartidor lleva el vuelto.',
+    name: 'Efectivo',
+    desc: {
+      delivery: 'Pagás al recibir. Avisanos con cuánto pagás así el repartidor lleva el vuelto.',
+      pickup: 'Pagás en el local cuando lo retirás.',
+    },
     icon: 'cash',
-  },
-  {
-    id: 'transferencia',
-    name: 'Transferencia',
-    desc: 'Te mandamos el alias por WhatsApp apenas confirmamos el pedido.',
-    icon: 'ticket',
   },
 ]
 
@@ -197,12 +194,14 @@ export default function CheckoutPage() {
                 <span className="pickcard__name">
                   <Icon name={option.icon} size={18} /> {option.name}
                 </span>
-                <span className="pickcard__desc">{option.desc}</span>
+                <span className="pickcard__desc">
+                  {typeof option.desc === 'string' ? option.desc : option.desc[cart.mode]}
+                </span>
               </span>
             </label>
           ))}
 
-          {payment === 'efectivo' && (
+          {payment === 'efectivo' && cart.mode === 'delivery' && (
             <div className="field" style={{ marginTop: 'var(--s4)' }}>
               <label className="field__label" htmlFor="changeFor">
                 Pagás con
