@@ -716,6 +716,14 @@ span.ad-pastilla { cursor: default; }
   border: 1px solid color-mix(in srgb, var(--ok) 32%, transparent);
   color: var(--ink);
 }
+/* Para un estado que no es ni error ni éxito, sino «así está esto
+   configurado»: lo usa el bloque de cobros para decir si hay una cuenta
+   conectada. En rojo parecería roto, y en verde parecería listo. */
+.ad-alerta--neutro {
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+}
 
 .ad-vacio {
   padding: var(--s8) var(--s4);

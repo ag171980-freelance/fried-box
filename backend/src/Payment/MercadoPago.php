@@ -26,9 +26,9 @@ final class MercadoPago
     }
 
     /** Null si no hay token cargado: el local todavía no conectó su cuenta. */
-    public static function desdeConfig(array $config): ?self
+    public static function desdeToken(?string $token): ?self
     {
-        $token = trim((string) ($config['access_token'] ?? ''));
+        $token = trim((string) $token);
 
         return $token === '' ? null : new self($token);
     }
@@ -205,7 +205,15 @@ final class MercadoPago
         $datos = json_decode((string) $respuesta, true);
 
         if ($status === 401) {
-            throw new HttpException(502, 'Mercado Pago rechazó el access token. Revisá MP_ACCESS_TOKEN en el .env.', 'mp_token_invalido');
+            // El token sale del panel del local (Local → Cobros), no del
+            // .env: mandar a revisar un archivo del servidor haría perder
+            // el tiempo a quien puede arreglarlo en treinta segundos.
+            throw new HttpException(
+                502,
+                'Mercado Pago rechazó las credenciales de este local. Volvé a cargar el '
+                . 'access token en el panel, en Local → Cobros.',
+                'mp_token_invalido',
+            );
         }
         if ($status < 200 || $status >= 300 || !is_array($datos)) {
             $mensaje = is_array($datos) ? (string) ($datos['message'] ?? 'error') : $errorRed;

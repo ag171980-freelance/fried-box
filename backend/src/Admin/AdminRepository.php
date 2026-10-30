@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Foodix\Admin;
 
 use Foodix\Support\HttpException;
+use Foodix\Support\Secretos;
 use Foodix\Support\Slug;
 use PDO;
 
@@ -18,8 +19,10 @@ use PDO;
  */
 final class AdminRepository
 {
-    public function __construct(private readonly PDO $db)
-    {
+    public function __construct(
+        private readonly PDO $db,
+        private readonly Secretos $secretos,
+    ) {
     }
 
     /* =================================================================
@@ -67,7 +70,33 @@ final class AdminRepository
             'etaPickupMax' => (int) $row['eta_pickup_max'],
             'theme' => $row['theme'],
             'layout' => $row['layout'],
+            'frontUrl' => $row['front_url'],
+            // El token no sale del servidor, ni siquiera al panel del
+            // propio local. Lo que viaja es si hay uno cargado, si se
+            // puede leer y si es de prueba: alcanza para que la pantalla
+            // diga en qué estado está el cobro, y no hay nada que robar
+            // si alguien mira la respuesta.
+            'mpConectado' => trim((string) $row['mp_access_token']) !== '',
+            'mpLegible' => $this->tokenDe($row) !== null,
+            'mpEsPrueba' => str_starts_with((string) $this->tokenDe($row), 'TEST-'),
+            'mpSecretoCargado' => trim((string) $row['mp_webhook_secret']) !== '',
+            // Sin APP_KEY no hay dónde guardar un token. La pantalla lo
+            // avisa antes de que alguien lo escriba y lo pierda.
+            'mpHayClave' => $this->secretos->hayClave(),
         ];
+    }
+
+    /**
+     * El token en claro, sólo para mirarlo acá adentro. Devuelve null si
+     * no hay, o si la fila quedó cifrada con otra APP_KEY: ese caso hay
+     * que poder distinguirlo de «no cargó ninguno», porque se arregla
+     * distinto.
+     *
+     * @param array<string,mixed> $row
+     */
+    private function tokenDe(array $row): ?string
+    {
+        return $this->secretos->descifrar($row['mp_access_token'] ?? null);
     }
 
     /** @param array<string,mixed> $d */
@@ -88,7 +117,8 @@ final class AdminRepository
                 min_order = :minimo, min_order_enabled = :minimoon,
                 eta_delivery_min = :edmin, eta_delivery_max = :edmax,
                 eta_pickup_min = :epmin, eta_pickup_max = :epmax,
-                theme = :tema, layout = :estilo
+                theme = :tema, layout = :estilo,
+                front_url = :sitio
               WHERE tenant_id = :t',
         )->execute([
             'dir' => $d['address'],
@@ -109,8 +139,67 @@ final class AdminRepository
             'epmax' => $d['etaPickupMax'],
             'tema' => $d['theme'],
             'estilo' => $d['layout'],
+            'sitio' => $d['frontUrl'],
             't' => $tenantId,
         ]);
+
+        $this->guardarCobros($tenantId, $d);
+    }
+
+    /**
+     * Las credenciales de cobro, que no se guardan como el resto de los
+     * campos.
+     *
+     * El panel nunca las recibe, así que tampoco puede reenviarlas al
+     * guardar: un campo vacío quiere decir «dejá la que está», no
+     * «borrala». Si no fuera así, cada vez que el local cambiara el
+     * horario se borraría su token.
+     *
+     * Para borrarla hay un pedido explícito, que limpia las dos: un
+     * local que desconecta su cuenta no se queda con la clave del
+     * webhook de una cuenta que ya no usa.
+     *
+     * @param array<string,mixed> $d
+     */
+    private function guardarCobros(int $tenantId, array $d): void
+    {
+        if ($d['mpDesconectar'] ?? false) {
+            $this->db->prepare(
+                "UPDATE tenant_settings
+                    SET mp_access_token = '', mp_webhook_secret = ''
+                  WHERE tenant_id = :t",
+            )->execute(['t' => $tenantId]);
+
+            return;
+        }
+
+        $token = trim((string) ($d['mpAccessToken'] ?? ''));
+        $secreto = trim((string) ($d['mpWebhookSecret'] ?? ''));
+
+        if ($token === '' && $secreto === '') {
+            return;
+        }
+
+        if (!$this->secretos->hayClave()) {
+            throw new HttpException(
+                503,
+                'Falta configurar APP_KEY en el servidor. Sin esa clave no podemos guardar '
+                . 'las credenciales de cobro, y guardarlas sin cifrar no es una opción.',
+                'sin_app_key',
+            );
+        }
+
+        if ($token !== '') {
+            $this->db->prepare(
+                'UPDATE tenant_settings SET mp_access_token = :v WHERE tenant_id = :t',
+            )->execute(['v' => $this->secretos->cifrar($token), 't' => $tenantId]);
+        }
+
+        if ($secreto !== '') {
+            $this->db->prepare(
+                'UPDATE tenant_settings SET mp_webhook_secret = :v WHERE tenant_id = :t',
+            )->execute(['v' => $this->secretos->cifrar($secreto), 't' => $tenantId]);
+        }
     }
 
     /** El interruptor de abierto/cerrado, que es el que más se usa. */

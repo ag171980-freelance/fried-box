@@ -166,9 +166,41 @@ final class AdminController
             'etaPickupMax' => $epMax,
             'theme' => $req->enum('theme', self::TEMAS, 'sifon'),
             'layout' => $req->enum('layout', self::ESTILOS, 'lista'),
+            'frontUrl' => self::sitio($req->str('frontUrl', 200)),
+            // Las credenciales van vacías salvo que el local las esté
+            // cargando ahora: el panel no las tiene, porque nunca se las
+            // devolvimos. Vacío significa «no las toques».
+            'mpAccessToken' => $req->str('mpAccessToken', 400),
+            'mpWebhookSecret' => $req->str('mpWebhookSecret', 200),
+            'mpDesconectar' => $req->bool('mpDesconectar', false),
         ]);
 
         Response::json(['settings' => $this->repo->settings((int) $user['tenant_id'])]);
+    }
+
+    /**
+     * El sitio del local, a donde vuelve el cliente desde Mercado Pago.
+     *
+     * Se exige http(s) y se corta la barra final. Una dirección sin
+     * esquema («friedbox.com.ar») armaría una vuelta relativa y el
+     * cliente terminaría en una página que no existe justo después de
+     * pagar, que es el peor momento para una pantalla en blanco.
+     */
+    private static function sitio(string $valor): string
+    {
+        $valor = rtrim(trim($valor), '/');
+        if ($valor === '') {
+            return '';
+        }
+
+        if (!str_starts_with($valor, 'http://') && !str_starts_with($valor, 'https://')) {
+            throw HttpException::badRequest(
+                'El sitio del local tiene que empezar con https://',
+                'sitio_invalido',
+            );
+        }
+
+        return $valor;
     }
 
     /** El interruptor grande de la pantalla principal. */

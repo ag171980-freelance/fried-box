@@ -54,6 +54,19 @@ return [
 
     'default_tenant' => $read('DEFAULT_TENANT', 'foodix'),
 
+    // La clave con la que se cifran las credenciales de cobro de cada
+    // local antes de guardarlas (ver src/Support/Secretos.php). 32
+    // bytes en hexadecimal. Sin esta clave el panel no deja cargar un
+    // token de Mercado Pago, porque guardarlo en claro no es opción.
+    //
+    // Si se pierde o se cambia, los tokens guardados dejan de poder
+    // descifrarse y cada local tiene que volver a cargar el suyo. No
+    // se pierden pedidos: sólo se deja de poder cobrar hasta que se
+    // recarguen.
+    //
+    // Una nueva: php -r "echo bin2hex(random_bytes(32));"
+    'app_key' => $read('APP_KEY', ''),
+
     // Endpoint que da pedidos por pagados sin pasarela real. Existe
     // hasta que haya credenciales de Mercado Pago. En producción, false.
     'allow_fake_payments' => $bool($read('ALLOW_FAKE_PAYMENTS', 'true')),

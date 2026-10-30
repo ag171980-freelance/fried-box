@@ -19,12 +19,12 @@ use Foodix\Order\OrderController;
 use Foodix\Order\OrderPresenter;
 use Foodix\Order\OrderRepository;
 use Foodix\Order\Pricing;
-use Foodix\Payment\Cobros;
-use Foodix\Payment\MercadoPago;
+use Foodix\Payment\Cuentas;
 use Foodix\Support\Database;
 use Foodix\Support\HttpException;
 use Foodix\Support\Response;
 use Foodix\Support\Router;
+use Foodix\Support\Secretos;
 use Foodix\Tenant\TenantResolver;
 
 $root = dirname(__DIR__);
@@ -121,9 +121,20 @@ try {
         orderController($config)->sincronizarPago($p);
     });
 
-    /* --- avisos de Mercado Pago ------------------------------------- */
+    /* --- avisos de Mercado Pago -------------------------------------
+       Cada local tiene la suya: es la que va grabada en la
+       `notification_url` de sus preferencias de pago, y es lo que permite
+       saber con qué token pedirle a Mercado Pago los datos del pago.
+
+       La ruta sin slug queda para los pagos que ya estaban en vuelo
+       cuando esto se desplegó, que llevan grabada la dirección vieja.
+       Resuelve por DEFAULT_TENANT. Cuando no queden preferencias viejas
+       se puede borrar. */
+    $router->post('/t/{tenantSlug}/webhooks/mercadopago', static function (array $p) use ($config): void {
+        orderController($config)->webhook($p);
+    });
     $router->post('/webhooks/mercadopago', static function () use ($config): void {
-        orderController($config)->webhook($config['mercadopago']['webhook_secret']);
+        orderController($config)->webhook();
     });
 
     $router->post('/t/{tenantSlug}/orders/quote', static function (array $p) use ($config): void {
@@ -294,7 +305,7 @@ function adminController(array $config): AdminController
 
     return new AdminController(
         new Auth($db),
-        new AdminRepository($db),
+        new AdminRepository($db, new Secretos($config['app_key'])),
         new Uploads(__DIR__ . '/uploads'),
     );
 }
@@ -318,7 +329,6 @@ function orderController(array $config): OrderController
     $db = Database::connect($config['db']);
 
     $orders = new OrderRepository($db);
-    $mp = MercadoPago::desdeConfig($config['mercadopago']);
 
     return new OrderController(
         new MenuRepository($db),
@@ -326,12 +336,20 @@ function orderController(array $config): OrderController
         new OrderPresenter(),
         new Pricing($db),
         new TenantResolver($db, $config['default_tenant']),
-        // Con Mercado Pago conectado, el simulador se apaga solo: así las
-        // pruebas pasan por el cobro de verdad.
-        $config['allow_fake_payments'] && $mp === null,
-        $mp,
-        $mp === null ? null : new Cobros($orders, $mp),
-        $config['front_url'],
-        $config['api_public_url'] === '' ? null : $config['api_public_url'] . '/webhooks/mercadopago',
+        // La cuenta de Mercado Pago sale de la fila del local, no de acá.
+        // El token del .env queda sólo como respaldo de DEFAULT_TENANT,
+        // para que la marca que ya cobraba no se corte el día del cambio.
+        new Cuentas(
+            $orders,
+            new Secretos($config['app_key']),
+            $config['mercadopago']['access_token'],
+            $config['mercadopago']['webhook_secret'],
+            $config['default_tenant'],
+            $config['front_url'],
+            $config['api_public_url'],
+        ),
+        // Con la cuenta conectada el simulador se apaga solo, local por
+        // local: así las pruebas pasan por el cobro de verdad.
+        $config['allow_fake_payments'],
     );
 }

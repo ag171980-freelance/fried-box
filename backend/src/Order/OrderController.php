@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Foodix\Order;
 
 use Foodix\Menu\MenuRepository;
-use Foodix\Payment\Cobros;
+use Foodix\Payment\CuentaMp;
+use Foodix\Payment\Cuentas;
 use Foodix\Payment\MercadoPago;
 use Foodix\Support\HttpException;
 use Foodix\Support\Request;
@@ -23,12 +24,32 @@ final class OrderController
         private readonly OrderPresenter $presenter,
         private readonly Pricing $pricing,
         private readonly TenantResolver $tenants,
-        private readonly bool $permitirPagoSimulado,
-        private readonly ?MercadoPago $mp = null,
-        private readonly ?Cobros $cobros = null,
-        private readonly string $urlFront = '',
-        private readonly ?string $urlWebhook = null,
+        private readonly Cuentas $cuentas,
+        private readonly bool $pagoSimuladoHabilitado,
     ) {
+    }
+
+    /**
+     * Con qué cuenta cobra este local. Se arma por pedido porque el token
+     * vive en su fila, no en el .env: dos marcas en el mismo servidor
+     * cobran cada una en su cuenta.
+     *
+     * @param array{id:int, slug:string} $tenant
+     * @param array<string,mixed>        $settings
+     */
+    private function cuenta(array $tenant, array $settings): CuentaMp
+    {
+        return $this->cuentas->de($tenant, $settings);
+    }
+
+    /**
+     * El simulador existe sólo donde no hay cuenta conectada. Un local
+     * que ya cobra de verdad no puede tener un endpoint que da pedidos
+     * por pagados, ni siquiera con la bandera encendida.
+     */
+    private function simulador(CuentaMp $cuenta): bool
+    {
+        return $this->pagoSimuladoHabilitado && !$cuenta->cobra();
     }
 
     /**
@@ -73,9 +94,11 @@ final class OrderController
         $mode = $req->enum('mode', self::MODOS, 'delivery');
         $paymentMethod = $req->enum('paymentMethod', self::METODOS_PAGO, 'mercadopago');
 
+        $cuenta = $this->cuenta($tenant, $settings);
+
         // Sin cuenta de Mercado Pago y sin simulador no hay cómo cobrar:
         // se corta antes de crear un pedido que nadie va a poder pagar.
-        if ($paymentMethod === 'mercadopago' && $this->mp === null && !$this->permitirPagoSimulado) {
+        if ($paymentMethod === 'mercadopago' && !$cuenta->cobra() && !$this->simulador($cuenta)) {
             throw new HttpException(503, 'Por ahora este local no acepta Mercado Pago. Elegí efectivo.', 'mp_no_configurado');
         }
         $customer = $req->obj('customer');
@@ -151,7 +174,7 @@ final class OrderController
             try {
                 // Con Mercado Pago conectado es el link de pago: una
                 // dirección de otro dominio, y el navegador sale de la app.
-                $checkoutUrl = $this->linkDePago($tenant, $creado['publicId']);
+                $checkoutUrl = $this->linkDePago($tenant, $cuenta, $creado['publicId']);
             } catch (HttpException $e) {
                 // El pedido ya existe. Si Mercado Pago no contestó, el
                 // cliente va a su pedido y paga desde ahí con «Ir a pagar».
@@ -185,7 +208,9 @@ final class OrderController
             throw new HttpException(409, 'Este pedido ya no está esperando el pago.', 'pedido_sin_pago_pendiente');
         }
 
-        Response::json(['checkoutUrl' => $this->linkDePago($tenant, $publicId)]);
+        $cuenta = $this->cuenta($tenant, $this->menus->settings($tenant['id']));
+
+        Response::json(['checkoutUrl' => $this->linkDePago($tenant, $cuenta, $publicId)]);
     }
 
     /**
@@ -204,12 +229,14 @@ final class OrderController
         $publicId = self::publicId($params);
         $order = $this->orders->find($tenant['id'], $publicId);
 
+        $cuenta = $this->cuenta($tenant, $this->menus->settings($tenant['id']));
+
         $pagoError = null;
-        if ($this->cobros !== null
+        if ($cuenta->cobros !== null
             && $order['payment_method'] === 'mercadopago'
             && in_array($order['status'], ['pendiente_de_pago', 'pago_rechazado'], true)) {
             try {
-                $this->cobros->sincronizar($publicId);
+                $cuenta->cobros->sincronizar($publicId);
                 $order = $this->orders->find($tenant['id'], $publicId);
             } catch (HttpException $e) {
                 // Si Mercado Pago no contesta, se muestra el pedido como
@@ -222,17 +249,32 @@ final class OrderController
     }
 
     /**
-     * POST /webhooks/mercadopago
+     * POST /t/{tenantSlug}/webhooks/mercadopago
      *
      * El aviso de Mercado Pago de que un pago cambió. Trae sólo el id: el
      * pago se pide a la API con el token del local y recién ahí se
      * aplica. Si hay clave secreta configurada, además se valida la firma.
      *
+     * El local viaja en la ruta y no se adivina. Tiene que ser así: para
+     * pedirle a Mercado Pago los datos del pago hace falta el token del
+     * local, pero de qué local es el pago se sabe recién adentro de esa
+     * respuesta. La `notification_url` de cada preferencia trae el slug
+     * justamente para cortar ese huevo y gallina.
+     *
+     * La ruta sin slug sigue viva para los pagos que ya estaban en vuelo
+     * cuando esto se desplegó: sus preferencias llevan grabada la
+     * dirección vieja, y ahí resuelve por DEFAULT_TENANT.
+     *
      * Siempre contesta rápido: si tarda o falla, Mercado Pago reintenta.
+     *
+     * @param array<string,string> $params
      */
-    public function webhook(string $secreto): void
+    public function webhook(array $params = []): void
     {
-        if ($this->cobros === null) {
+        $tenant = $this->tenants->find($this->tenants->resolveSlug($params['tenantSlug'] ?? null));
+        $cuenta = $this->cuenta($tenant, $this->menus->settings($tenant['id']));
+
+        if ($cuenta->cobros === null) {
             Response::json(['ok' => false, 'motivo' => 'Mercado Pago no está configurado.']);
             return;
         }
@@ -251,25 +293,25 @@ final class OrderController
             return;
         }
 
-        if ($secreto !== '' && !MercadoPago::firmaValida(
+        if ($cuenta->secretoWebhook !== '' && !MercadoPago::firmaValida(
             (string) ($_SERVER['HTTP_X_SIGNATURE'] ?? ''),
             (string) ($_SERVER['HTTP_X_REQUEST_ID'] ?? ''),
             $id,
-            $secreto,
+            $cuenta->secretoWebhook,
         )) {
             throw new HttpException(401, 'Firma inválida.', 'mp_firma_invalida');
         }
 
-        $this->cobros->aplicarPorId($id);
+        $cuenta->cobros->aplicarPorId($id);
 
         Response::json(['ok' => true]);
     }
 
     /** @param array{id:int,slug:string,name:string} $tenant */
-    private function linkDePago(array $tenant, string $publicId): string
+    private function linkDePago(array $tenant, CuentaMp $cuenta, string $publicId): string
     {
-        if ($this->mp === null) {
-            if (!$this->permitirPagoSimulado) {
+        if ($cuenta->mp === null) {
+            if (!$this->simulador($cuenta)) {
                 throw new HttpException(503, 'Por ahora este local no acepta Mercado Pago.', 'mp_no_configurado');
             }
             return '/pago-simulado/' . $publicId;
@@ -277,11 +319,11 @@ final class OrderController
 
         $order = $this->orders->find($tenant['id'], $publicId);
 
-        return $this->mp->crearPreferencia(
+        return $cuenta->mp->crearPreferencia(
             $order,
             (string) $tenant['name'],
-            $this->urlFront,
-            $this->urlWebhook,
+            $cuenta->urlFront,
+            $cuenta->urlWebhook,
         )['url'];
     }
 
@@ -310,12 +352,16 @@ final class OrderController
      */
     public function fakePayment(array $params): void
     {
-        if (!$this->permitirPagoSimulado) {
+        $tenant = $this->tenants->find($this->tenants->resolveSlug($params['tenantSlug'] ?? null));
+
+        // El permiso se mira después de saber de qué local hablamos: un
+        // local con su cuenta conectada no tiene pago simulado, aunque la
+        // bandera del servidor esté encendida para otro.
+        if (!$this->simulador($this->cuenta($tenant, $this->menus->settings($tenant['id'])))) {
             throw new HttpException(403, 'El pago simulado está deshabilitado.', 'pago_simulado_off');
         }
 
         $req = Request::json();
-        $tenant = $this->tenants->find($this->tenants->resolveSlug($params['tenantSlug'] ?? null));
 
         // Sin valor por defecto a propósito: si el cliente manda algo que
         // no se entiende, la respuesta es un error. Caer en "aprobado"

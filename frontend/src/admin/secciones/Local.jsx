@@ -7,16 +7,28 @@ import { useAccion, usePanel } from '../PanelProvider.jsx'
 /**
  * La configuración del local.
  *
- * Tres bloques: cómo se entrega (envío, retiro, demoras, mínimo), los
- * datos de contacto, y cómo se ve la carta. El estilo y la paleta salen
- * del mismo catálogo que usa la app del cliente (LAYOUTS y THEMES), así
- * que lo que se elige acá es exactamente lo que el cliente va a ver.
+ * Cómo se entrega, con qué cuenta se cobra, los datos de contacto y cómo
+ * se ve la carta. El estilo y la paleta salen del mismo catálogo que usa
+ * la app del cliente (LAYOUTS y THEMES), así que lo que se elige acá es
+ * exactamente lo que el cliente va a ver.
+ *
+ * El bloque de Cobros se comporta distinto al resto: las credenciales de
+ * Mercado Pago entran pero no vuelven. El servidor nunca las manda, así
+ * que esta pantalla no las tiene y un campo vacío significa «dejá la que
+ * está». Si no fuera así, cambiar un horario borraría el token.
  */
 export default function Local() {
   const { datos } = usePanel()
   const { correr, ocupado, error } = useAccion()
   const [f, setF] = useState(datos.settings)
   const [guardado, setGuardado] = useState(false)
+
+  // Las credenciales van aparte de `f` a propósito: `f` se reemplaza con
+  // lo que contesta el servidor al guardar, y el servidor no las
+  // devuelve. Acá quedan vacías después de guardar, que es lo correcto.
+  const [token, setToken] = useState('')
+  const [secreto, setSecreto] = useState('')
+  const [desconectar, setDesconectar] = useState(false)
 
   const set = (k) => (v) => {
     setF((x) => ({ ...x, [k]: v }))
@@ -34,14 +46,60 @@ export default function Local() {
         etaDeliveryMax: Number(f.etaDeliveryMax) || 0,
         etaPickupMin: Number(f.etaPickupMin) || 0,
         etaPickupMax: Number(f.etaPickupMax) || 0,
+        mpAccessToken: token,
+        mpWebhookSecret: secreto,
+        mpDesconectar: desconectar,
       }),
     )
 
     if (res) {
       setF(res.settings)
       setGuardado(true)
+      // Los campos de credenciales se vacían: lo que se guardó ya está,
+      // y dejar el token a la vista en la pantalla no suma nada.
+      setToken('')
+      setSecreto('')
+      setDesconectar(false)
     }
   }
+
+  // Cinco estados y cada uno se arregla distinto, así que no alcanza con
+  // «conectado o no». El que más importa es el tercero: una cuenta
+  // guardada que no se puede leer parece conectada y no cobra.
+  const cobro = (() => {
+    if (!f.mpHayClave) {
+      return {
+        tono: 'error',
+        texto:
+          'El servidor todavía no tiene la clave con la que se guardan las credenciales (APP_KEY), así que no se puede conectar una cuenta. Avisale a quien lo administra.',
+      }
+    }
+    if (f.mpConectado && !f.mpLegible) {
+      return {
+        tono: 'error',
+        texto:
+          'Hay una cuenta guardada pero el servidor no puede leerla: le cambió la clave. Volvé a cargar el access token y se arregla.',
+      }
+    }
+    if (!f.mpConectado) {
+      return {
+        tono: 'neutro',
+        texto:
+          'Todavía no conectaste tu cuenta. Hasta que lo hagas, tus clientes sólo pueden pagar en efectivo.',
+      }
+    }
+    if (f.mpEsPrueba) {
+      return {
+        tono: 'neutro',
+        texto:
+          'Conectado con credenciales de prueba. Sirve para probar el circuito completo, pero los pagos no son reales y no te entra plata.',
+      }
+    }
+    return {
+      tono: 'ok',
+      texto: 'Conectado. Los pagos entran en tu cuenta de Mercado Pago.',
+    }
+  })()
 
   return (
     <form onSubmit={guardar}>
@@ -156,6 +214,54 @@ export default function Local() {
             sufijo="min"
           />
         </div>
+      </section>
+
+      <section className="ad-bloque">
+        <h2 className="ad-bloque__titulo">Cobros</h2>
+
+        <Alerta error={cobro.texto} tono={cobro.tono} />
+
+        <Texto
+          etiqueta={f.mpConectado ? 'Reemplazar el access token' : 'Access token de Mercado Pago'}
+          ayuda="Está en tu cuenta: Tus integraciones → Credenciales. El de prueba empieza con TEST-. Una vez guardado no se vuelve a mostrar."
+          valor={token}
+          alCambiar={setToken}
+          type="password"
+          autoComplete="off"
+          maxLength={400}
+          placeholder={f.mpConectado ? 'Dejalo vacío para no cambiarlo' : ''}
+        />
+
+        <Texto
+          etiqueta={f.mpSecretoCargado ? 'Reemplazar la clave del webhook' : 'Clave secreta del webhook'}
+          ayuda="Opcional, en Tus integraciones → Webhooks. Cargada, los avisos de pago que no traigan una firma válida se rechazan."
+          valor={secreto}
+          alCambiar={setSecreto}
+          type="password"
+          autoComplete="off"
+          maxLength={200}
+          placeholder={f.mpSecretoCargado ? 'Dejalo vacío para no cambiarla' : ''}
+        />
+
+        <Texto
+          etiqueta="Sitio del local"
+          ayuda="A dónde vuelve el cliente cuando termina de pagar. Tiene que empezar con https://"
+          valor={f.frontUrl}
+          alCambiar={set('frontUrl')}
+          maxLength={200}
+          placeholder="https://friedbox.netlify.app"
+        />
+
+        {/* Aparece sólo si hay algo que desconectar, y recién se aplica
+            al guardar, como todo lo demás de esta pantalla. */}
+        {f.mpConectado && (
+          <Interruptor
+            etiqueta="Desconectar la cuenta al guardar"
+            ayuda="Borra el token y la clave del webhook. Los pedidos ya cobrados quedan como están, pero tus clientes van a poder pagar sólo en efectivo."
+            valor={desconectar}
+            alCambiar={setDesconectar}
+          />
+        )}
       </section>
 
       <section className="ad-bloque">
