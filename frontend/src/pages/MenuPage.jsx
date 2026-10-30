@@ -225,7 +225,7 @@ export default function MenuPage() {
               <header className="section__head">
                 <h2 className="section__title">Promos</h2>
               </header>
-              <div className="promogrid">
+              <div className="promogrid u-scroll-x">
                 {menu.promos.map((promo) => (
                   <button
                     key={promo.id}

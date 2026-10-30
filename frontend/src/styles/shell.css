@@ -83,11 +83,31 @@
    Tarjetas en el color de la marca, primera sección de la carta. Es
    el único momento de color fuerte antes de la comida.
    ------------------------------------------------------------- */
+/* Las promos de la carta van en fila, no apiladas.
+   En una columna, tres promos daban 958px de alto en un teléfono: un
+   muro naranja que había que scrollear entero para llegar a la comida.
+   Y en escritorio la grilla de dos columnas dejaba la tercera sola al
+   lado de una celda vacía, porque tres no entra en dos columnas.
+
+   En fila las tres miden lo mismo pase lo que pase, y el pedazo de la
+   siguiente que asoma es lo que avisa que hay más. Es el mismo gesto
+   que el carrusel de platos, así que no hay nada nuevo que aprender. */
 .promogrid {
-  display: grid;
+  display: flex;
   gap: var(--s3);
+  /* Sangra hasta los bordes de la pantalla y devuelve el aire por
+     dentro: así la tarjeta que asoma se corta contra el borde y no
+     contra un margen, que es lo que la hace leer como «hay más». */
+  margin-inline: calc(var(--s4) * -1);
+  padding-inline: var(--s4);
+  padding-bottom: var(--s2);
+}
+@media (min-width: 720px) {
+  .promogrid { margin-inline: calc(var(--s6) * -1); padding-inline: var(--s6); }
 }
 .promo {
+  flex: 0 0 min(84%, 340px);
+  scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -159,7 +179,6 @@
 }
 
 @media (min-width: 720px) {
-  .promogrid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
   .promo__content { padding: var(--s5) var(--s6); }
   .promo__title { font-size: 1.5rem; }
 }

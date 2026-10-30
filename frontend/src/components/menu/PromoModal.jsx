@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../ui/Icon.jsx'
 import { PROMO_IMAGE } from '../../brand.js'
 
@@ -8,21 +8,78 @@ import { PROMO_IMAGE } from '../../brand.js'
  * Se muestra una vez por visita: quien la cerró y sigue mirando la carta
  * no la vuelve a ver al recargar. Si el local cambia sus promos, la
  * firma cambia y aparece de nuevo.
+ *
+ * Van de a una, en horizontal. Antes iban apiladas: tres tarjetas con su
+ * foto a sangre, una debajo de la otra, daban casi 800px dentro de un
+ * modal que mide 88dvh. O sea que el cliente veía una promo y el borde
+ * de la siguiente, sin nada que le avisara que había más, y teniendo que
+ * descubrir que se scrollea adentro de un cartel que acaba de aparecer.
+ * Encima las tres repetían el mismo bloque naranja a sangre completa.
+ *
+ * Con una a la vez cada promo ocupa la pantalla entera, se pasa con el
+ * dedo como cualquier carrusel, y los puntos dicen cuántas hay sin tener
+ * que contarlas.
  */
 export default function PromoModal({ promos, onClose, onPick }) {
   const dialogRef = useRef(null)
+  const pistaRef = useRef(null)
+  const [activa, setActiva] = useState(0)
+
+  // Con una sola promo no hay nada que navegar: ni flechas ni puntos.
+  const varias = promos.length > 1
+
+  const irA = useCallback((i) => {
+    const pista = pistaRef.current
+    if (!pista) return
+
+    const destino = Math.max(0, Math.min(i, pista.children.length - 1))
+    const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    // Cada promo mide exactamente el ancho de la pista, así que la
+    // posición es una multiplicación y no hace falta medir el DOM.
+    pista.scrollTo({ left: destino * pista.clientWidth, behavior: quieto ? 'auto' : 'smooth' })
+  }, [])
 
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     dialogRef.current?.focus()
-    const onKey = (e) => e.key === 'Escape' && onClose()
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') return onClose()
+      if (!varias) return
+      if (e.key === 'ArrowRight') irA(activa + 1)
+      if (e.key === 'ArrowLeft') irA(activa - 1)
+    }
+
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [onClose])
+  }, [onClose, varias, activa, irA])
+
+  /**
+   * Cuál se está viendo. Va con IntersectionObserver y no escuchando el
+   * scroll: el scroll dispara en cada cuadro y acá sólo importa cuándo
+   * cambia de promo, que son tres veces en toda la vida del modal.
+   */
+  useEffect(() => {
+    const pista = pistaRef.current
+    if (!pista || !varias) return
+
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        for (const e of entradas) {
+          if (e.isIntersecting) setActiva(Number(e.target.dataset.i))
+        }
+      },
+      { root: pista, threshold: 0.6 },
+    )
+
+    for (const slide of pista.children) obs.observe(slide)
+    return () => obs.disconnect()
+  }, [varias, promos.length])
 
   return (
     <div className="sheet-backdrop promomodal-backdrop" onClick={onClose} role="presentation">
@@ -43,27 +100,87 @@ export default function PromoModal({ promos, onClose, onPick }) {
           Promos
         </p>
 
-        <ul className="promomodal__list">
-          {promos.map((promo) => (
-            <li key={promo.id} className="promomodal__item">
-              <PromoImage promo={promo} className="promomodal__img" eager />
-              <PromoTag promo={promo} />
-              {promo.kicker && <span className="promo__kicker u-mono">{promo.kicker}</span>}
-              <span className="promomodal__title">{promo.title}</span>
-              {promo.body && <span className="promomodal__body">{promo.body}</span>}
-              {promo.itemId && (
-                <button
-                  type="button"
-                  className="btn btn--sm promomodal__go"
-                  onClick={() => onPick(promo)}
-                >
-                  Lo quiero
-                  <Icon name="next" size={16} />
-                </button>
-              )}
+        <ul
+          className="promodeck u-scroll-x"
+          ref={pistaRef}
+          role={varias ? 'group' : undefined}
+          aria-roledescription={varias ? 'carrusel' : undefined}
+          aria-label={varias ? `${promos.length} promos` : undefined}
+        >
+          {promos.map((promo, i) => (
+            <li
+              key={promo.id}
+              className="promodeck__slide"
+              data-i={i}
+              role={varias ? 'group' : undefined}
+              aria-label={varias ? `${i + 1} de ${promos.length}` : undefined}
+            >
+              <PromoImage promo={promo} className="promodeck__img" eager={i === 0} />
+
+              <div className="promodeck__texto">
+                <PromoTag promo={promo} />
+                {promo.kicker && <span className="promo__kicker u-mono">{promo.kicker}</span>}
+                <span className="promodeck__title">{promo.title}</span>
+                {promo.body && <span className="promodeck__body">{promo.body}</span>}
+                {promo.itemId && (
+                  <button
+                    type="button"
+                    className="btn btn--sm promodeck__go"
+                    onClick={() => onPick(promo)}
+                  >
+                    Lo quiero
+                    <Icon name="next" size={16} />
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
+
+        {varias && (
+          <div className="promonav">
+            <button
+              type="button"
+              className="promonav__flecha"
+              onClick={() => irA(activa - 1)}
+              disabled={activa === 0}
+              aria-label="Promo anterior"
+            >
+              <Icon name="back" size={18} strokeWidth={2} />
+            </button>
+
+            <ol className="promonav__puntos">
+              {promos.map((promo, i) => (
+                <li key={promo.id}>
+                  <button
+                    type="button"
+                    className={i === activa ? 'promonav__punto is-activo' : 'promonav__punto'}
+                    onClick={() => irA(i)}
+                    aria-label={`Ir a ${promo.title}`}
+                    aria-current={i === activa ? 'true' : undefined}
+                  />
+                </li>
+              ))}
+            </ol>
+
+            <button
+              type="button"
+              className="promonav__flecha"
+              onClick={() => irA(activa + 1)}
+              disabled={activa === promos.length - 1}
+              aria-label="Promo siguiente"
+            >
+              <Icon name="next" size={18} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+
+        {/* Los puntos se ven; esto es para quien escucha la pantalla. */}
+        {varias && (
+          <p className="u-sr" aria-live="polite">
+            Promo {activa + 1} de {promos.length}: {promos[activa]?.title}
+          </p>
+        )}
 
         <button type="button" className="btn btn--ghost btn--block promomodal__skip" onClick={onClose}>
           Ver la carta

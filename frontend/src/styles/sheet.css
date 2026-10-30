@@ -212,36 +212,111 @@ div.opt { cursor: default; }
   color: var(--ink-3);
   margin-bottom: var(--s4);
 }
-.promomodal__list { display: grid; gap: var(--s3); list-style: none; padding: 0; margin: 0; }
-.promomodal__item {
-  display: grid;
-  justify-items: start;
+/* La pista de promos -----------------------------------------------
+   De a una y en horizontal. Apiladas eran tres tarjetas de unos 260px
+   cada una dentro de un modal de 88dvh: se veía una y el borde de la
+   siguiente, sin señal de que hubiera más. Así cada promo se queda con
+   la pantalla y pasar a la próxima es el gesto que ya hace cualquiera.
+
+   El scroll-snap hace el trabajo; el JS sólo mira cuál quedó al frente
+   para encender el punto. */
+.promodeck {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  scroll-behavior: smooth;
+  /* La pista es la que se desplaza, no el modal: así el cartel no se
+     mueve bajo el dedo mientras se pasa de promo. */
+  overscroll-behavior-x: contain;
+}
+@media (prefers-reduced-motion: reduce) {
+  .promodeck { scroll-behavior: auto; }
+}
+.promodeck__slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  padding: var(--s5);
   border-radius: var(--r-lg);
   background: var(--brand);
   color: var(--brand-ink);
 }
-.promomodal__img {
+.promodeck__img {
   display: block;
-  width: calc(100% + 2 * var(--s5));
-  max-width: none;
-  aspect-ratio: 2 / 1;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   object-fit: cover;
-  margin: calc(-1 * var(--s5)) calc(-1 * var(--s5)) var(--s4);
   background: var(--surface-2);
 }
-.promomodal__title {
+.promodeck__texto {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  /* Empuja el botón al pie: con textos de distinto largo, los «Lo
+     quiero» de cada promo quedan a la misma altura al pasar. */
+  flex: 1;
+  padding: var(--s5);
+}
+.promodeck__title {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.625rem;
   line-height: 1.05;
   letter-spacing: -0.035em;
 }
-.promomodal__body { margin-top: var(--s2); opacity: 0.85; }
-.promomodal__go {
-  margin-top: var(--s4);
+.promodeck__body { margin-top: var(--s2); opacity: 0.85; }
+.promodeck__go {
+  margin-top: auto;
+  padding-top: var(--s2);
   background: var(--brand-ink);
   color: var(--brand);
 }
+
+/* Flechas y puntos -------------------------------------------------
+   Las flechas quedan también en mobile, aunque ahí se pase con el
+   dedo: son lo que avisa que hay más de una promo antes de que a
+   nadie se le ocurra deslizar. */
+.promonav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  margin-top: var(--s4);
+}
+.promonav__flecha {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  color: var(--ink);
+  transition: background var(--dur-1) var(--ease-out);
+}
+.promonav__flecha:hover:not(:disabled),
+.promonav__flecha:focus-visible:not(:disabled) { background: var(--surface-2); }
+.promonav__flecha:disabled { opacity: 0.3; cursor: default; }
+.promonav__puntos {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.promonav__punto {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+  transition: background var(--dur-2) var(--ease-out), width var(--dur-2) var(--ease-out);
+}
+/* El punto de la promo que se está viendo se estira en vez de sólo
+   cambiar de color: se distingue aunque el naranja y el gris se
+   parezcan en una pantalla al sol. */
+.promonav__punto.is-activo { width: 22px; background: var(--brand); }
+.promonav__punto:hover:not(.is-activo) { background: var(--ink-3); }
+
 .promomodal__skip { margin-top: var(--s4); }
