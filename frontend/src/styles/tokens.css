@@ -47,6 +47,9 @@
   --z-bar: 40;
   --z-sheet: 60;
   --z-lab: 55;
+  /* El panel lateral del admin vive en 80; la confirmación se abre
+     desde adentro de él, así que va arriba. */
+  --z-confirma: 90;
 
   /* Alturas fijas --------------------------------------------- */
   --header-h: 56px;

@@ -3,6 +3,7 @@ import Icon from '../../components/ui/Icon.jsx'
 import { clock, money } from '../../lib/format.js'
 import * as api from '../api.js'
 import { Alerta, Vacio } from '../Campos.jsx'
+import ConfirmarCancelacion from '../Confirmar.jsx'
 import Estadisticas from './Estadisticas.jsx'
 
 /** Cada cuánto se miran los pedidos en curso. */
@@ -165,6 +166,9 @@ function EnCurso({ alAbrir, alContar, cambios }) {
   const [error, setError] = useState(null)
   const [nuevos, setNuevos] = useState(() => new Set())
   const [sonido, setSonido] = useState(leerSonido)
+  const [aCancelar, setACancelar] = useState(null)
+  const [cancelando, setCancelando] = useState(false)
+  const [errorCancelar, setErrorCancelar] = useState(null)
   const vistos = useRef(null)
 
   const cargar = useCallback(async () => {
@@ -215,27 +219,40 @@ function EnCurso({ alAbrir, alContar, cambios }) {
     }
   }, [sinVer])
 
+  const aplicar = async (o, status, note = '') => {
+    await api.cambiarEstadoPedido(o.id, status, note)
+    setNuevos((prev) => {
+      const next = new Set(prev)
+      next.delete(o.id)
+      return next
+    })
+    cargar()
+  }
+
+  // Cancelar no se hace de una: pide el motivo, que lo lee el cliente.
   const mover = async (o, status) => {
-    let note = ''
     if (status === 'cancelado') {
-      const motivo = window.prompt(
-        `¿Cancelar el pedido #${o.number}? Contale al cliente por qué (lo va a ver en su pedido).`,
-        '',
-      )
-      if (motivo === null) return
-      note = motivo
+      setACancelar(o)
+      return
     }
     try {
-      await api.cambiarEstadoPedido(o.id, status, note)
-      setNuevos((prev) => {
-        const next = new Set(prev)
-        next.delete(o.id)
-        return next
-      })
-      cargar()
+      await aplicar(o, status)
     } catch (e) {
       setError(e)
       cargar()
+    }
+  }
+
+  const confirmarCancelacion = async (motivo) => {
+    setCancelando(true)
+    setErrorCancelar(null)
+    try {
+      await aplicar(aCancelar, 'cancelado', motivo)
+      setACancelar(null)
+    } catch (e) {
+      setErrorCancelar(e)
+    } finally {
+      setCancelando(false)
     }
   }
 
@@ -297,6 +314,19 @@ function EnCurso({ alAbrir, alContar, cambios }) {
             </section>
           )
         })
+      )}
+
+      {aCancelar && (
+        <ConfirmarCancelacion
+          numero={aCancelar.number}
+          ocupado={cancelando}
+          error={errorCancelar}
+          alConfirmar={confirmarCancelacion}
+          alCerrar={() => {
+            setACancelar(null)
+            setErrorCancelar(null)
+          }}
+        />
       )}
     </>
   )
@@ -470,6 +500,8 @@ function Detalle({ id, alCerrar, alCambiar }) {
   const [o, setO] = useState(null)
   const [error, setError] = useState(null)
   const [ocupado, setOcupado] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+  const [errorCancelar, setErrorCancelar] = useState(null)
 
   useEffect(() => {
     let vigente = true
@@ -483,26 +515,44 @@ function Detalle({ id, alCerrar, alCambiar }) {
   }, [id])
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && alCerrar()
+    // Con la confirmación abierta el Escape es de ella, no del panel:
+    // si no, una sola tecla cerraría los dos.
+    const onKey = (e) => e.key === 'Escape' && !confirmando && alCerrar()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [alCerrar])
+  }, [alCerrar, confirmando])
 
+  // Cancelar pasa por la confirmación, que es la que pide el motivo.
   const mover = async (status) => {
-    let note = ''
     if (status === 'cancelado') {
-      const motivo = window.prompt('Contale al cliente por qué se cancela (lo va a ver en su pedido).', '')
-      if (motivo === null) return
-      note = motivo
+      setConfirmando(true)
+      return
     }
     setOcupado(true)
     setError(null)
     try {
-      const res = await api.cambiarEstadoPedido(id, status, note)
+      const res = await api.cambiarEstadoPedido(id, status, '')
       setO(res.order)
       alCambiar()
     } catch (e) {
       setError(e)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  // El error de cancelar va aparte: se muestra adentro de la
+  // confirmación, no en el cuerpo del panel que quedó atrás.
+  const confirmarCancelacion = async (motivo) => {
+    setOcupado(true)
+    setErrorCancelar(null)
+    try {
+      const res = await api.cambiarEstadoPedido(id, 'cancelado', motivo)
+      setO(res.order)
+      alCambiar()
+      setConfirmando(false)
+    } catch (e) {
+      setErrorCancelar(e)
     } finally {
       setOcupado(false)
     }
@@ -653,6 +703,19 @@ function Detalle({ id, alCerrar, alCambiar }) {
               </button>
             )}
           </footer>
+        )}
+
+        {confirmando && o && (
+          <ConfirmarCancelacion
+            numero={o.number}
+            ocupado={ocupado}
+            error={errorCancelar}
+            alConfirmar={confirmarCancelacion}
+            alCerrar={() => {
+              setConfirmando(false)
+              setErrorCancelar(null)
+            }}
+          />
         )}
       </div>
     </div>

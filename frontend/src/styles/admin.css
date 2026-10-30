@@ -1043,3 +1043,55 @@ span.ad-pastilla { cursor: default; }
 .ad-grafico__tabla th + th { text-align: right; font-family: var(--font-mono); }
 
 .ad-pedidos__deldia { margin-top: var(--s2); }
+
+/* --- Modal de confirmación ---------------------------------------- */
+/* Centrado, no lateral: el panel lateral es para editar, esto es una
+   pregunta de sí o no. Va por encima del panel, porque se abre desde
+   adentro del detalle del pedido. */
+
+.ad-modal-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-confirma);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s4);
+  background: rgb(0 0 0 / 0.42);
+  animation: ad-fundido var(--dur-2) var(--ease-out);
+}
+.ad-modal {
+  width: min(430px, 100%);
+  max-height: calc(100dvh - var(--s8));
+  overflow-y: auto;
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--ad-linea);
+  border-radius: var(--ad-r);
+  box-shadow: var(--shadow-3);
+  animation: ad-sube var(--dur-3) var(--ease-out);
+}
+.ad-modal__titulo {
+  margin: 0 0 var(--s2);
+  font-size: var(--t-md);
+  letter-spacing: -0.02em;
+}
+.ad-modal__texto {
+  margin: 0 0 var(--s4);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+}
+.ad-modal__pie {
+  display: flex;
+  gap: var(--s2);
+  margin-top: var(--s5);
+}
+/* Los dos del mismo ancho: ninguna de las dos salidas se esconde. */
+.ad-modal__pie .ad-btn { flex: 1; }
+
+@keyframes ad-sube { from { transform: translateY(8px); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ad-modal-fondo, .ad-modal { animation: none; }
+}
