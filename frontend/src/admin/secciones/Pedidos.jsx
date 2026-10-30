@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon.jsx'
-import { clock, money } from '../../lib/format.js'
+import { clock, money, shippingText } from '../../lib/format.js'
 import * as api from '../api.js'
 import { Alerta, Vacio } from '../Campos.jsx'
 import ConfirmarCancelacion from '../Confirmar.jsx'
@@ -633,7 +633,9 @@ function Detalle({ id, alCerrar, alCambiar }) {
                   )}
                   <div>
                     <dt>{o.mode === 'delivery' ? 'Envío' : 'Retiro'}</dt>
-                    <dd>{o.shipping > 0 ? money(o.shipping) : 'sin cargo'}</dd>
+                    {/* «a cotizar» avisa que ese envío se cobra aparte y
+                        que el total de abajo no lo incluye. */}
+                    <dd>{shippingText(o.shippingVariable ? null : o.shipping)}</dd>
                   </div>
                   <div className="is-total">
                     <dt>Total</dt>

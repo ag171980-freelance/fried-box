@@ -155,7 +155,11 @@ final class AdminController
             'acceptsDelivery' => $aceptaEnvio,
             'acceptsPickup' => $aceptaRetiro,
             'deliveryFee' => max(0.0, $req->float('deliveryFee') ?? 0.0),
+            // El monto se guarda igual aunque esté apagado: lo que manda
+            // es el interruptor, y así el local no lo pierde.
+            'deliveryFeeVariable' => $req->bool('deliveryFeeVariable', false),
             'minOrder' => max(0.0, $req->float('minOrder') ?? 0.0),
+            'minOrderEnabled' => $req->bool('minOrderEnabled', true),
             'etaDeliveryMin' => $edMin,
             'etaDeliveryMax' => $edMax,
             'etaPickupMin' => $epMin,

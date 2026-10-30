@@ -91,8 +91,16 @@ final class MenuPresenter
             'phone' => $settings['phone'],
             'hours' => $settings['hours_text'],
             'currency' => $settings['currency'],
-            'deliveryFee' => (float) $settings['delivery_fee'],
-            'minOrder' => (float) $settings['min_order'],
+            // null no es 0. Un costo de envío en 0 es «sin cargo», y un
+            // mínimo en 0 es «no hay mínimo»: las dos cosas se muestran
+            // distinto, así que el front recibe null cuando no hay monto
+            // que mostrar y nunca tiene que adivinarlo.
+            'deliveryFee' => ($settings['delivery_fee_variable'] ?? false)
+                ? null
+                : (float) $settings['delivery_fee'],
+            'minOrder' => ($settings['min_order_enabled'] ?? true)
+                ? (float) $settings['min_order']
+                : null,
             'etaDelivery' => self::eta($settings['eta_delivery_min'], $settings['eta_delivery_max']),
             'etaPickup' => self::eta($settings['eta_pickup_min'], $settings['eta_pickup_max']),
             'acceptsDelivery' => (bool) $settings['accepts_delivery'],

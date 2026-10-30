@@ -1,4 +1,4 @@
-import { clock, money } from '../../lib/format.js'
+import { clock, money, shippingText } from '../../lib/format.js'
 import { useVenue } from '../../store/VenueProvider.jsx'
 import Icon from '../ui/Icon.jsx'
 
@@ -55,8 +55,14 @@ export default function Ticket({
                     <Icon name="plus" size={14} strokeWidth={2.2} />
                   </button>
                 </span>
-                <button type="button" className="tline__drop" onClick={() => onRemove(line.key)}>
-                  Sacar
+                <button
+                  type="button"
+                  className="tline__drop"
+                  onClick={() => onRemove(line.key)}
+                  title="Sacar del pedido"
+                  aria-label={`Sacar ${line.name ?? 'el plato'} del pedido`}
+                >
+                  <Icon name="trash" size={16} />
                 </button>
               </div>
             )}
@@ -85,12 +91,19 @@ export default function Ticket({
         )}
         <p className="tsum tsum--muted">
           <span>{mode === 'delivery' ? 'Envío' : 'Retiro en el local'}</span>
-          <span>{quote.shipping > 0 ? money(quote.shipping) : 'sin cargo'}</span>
+          <span>{shippingText(quote.shippingVariable ? null : quote.shipping)}</span>
         </p>
         <p className="tsum tsum--total">
           <span>Total</span>
           <span>{money(quote.total)}</span>
         </p>
+        {/* Sin esto el total parece el precio final y no lo es: el envío
+            lo cobra el local aparte cuando sabe cuánto sale. */}
+        {quote.shippingVariable && (
+          <p className="tsum tsum--muted tsum--nota">
+            El total es sólo la comida. El envío se cobra aparte.
+          </p>
+        )}
       </div>
 
       {footer && <p className="ticket__stamp">{footer}</p>}

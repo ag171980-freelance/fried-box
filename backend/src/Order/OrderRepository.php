@@ -46,14 +46,16 @@ final class OrderRepository
                     customer_name, customer_phone, customer_email,
                     address, address_extra, note, change_for,
                     coupon_id, coupon_code,
-                    subtotal, discount, promo_discount, promo_label, shipping, total, currency, eta_text)
+                    subtotal, discount, promo_discount, promo_label,
+                    shipping, shipping_variable, total, currency, eta_text)
                  VALUES
                    (:tenant, :menu, :public, :number, :status, :mode,
                     :method, :pstatus,
                     :name, :phone, :email,
                     :address, :extra, :note, :change,
                     :coupon_id, :coupon_code,
-                    :subtotal, :discount, :promo_discount, :promo_label, :shipping, :total, :currency, :eta)',
+                    :subtotal, :discount, :promo_discount, :promo_label,
+                    :shipping, :shipping_var, :total, :currency, :eta)',
             );
 
             $stmt->execute([
@@ -81,6 +83,10 @@ final class OrderRepository
                 'promo_discount' => Money::toDecimal($quote['cents']['promoDiscount']),
                 'promo_label' => $quote['promoLabel'] === null ? null : mb_substr($quote['promoLabel'], 0, 200),
                 'shipping' => Money::toDecimal($quote['cents']['shipping']),
+                // Queda con el pedido, como el eta_text: la configuración
+                // del local cambia y los pedidos viejos tienen que seguir
+                // contando lo que pasó ese día.
+                'shipping_var' => ($quote['shippingVariable'] ?? false) ? 1 : 0,
                 'total' => Money::toDecimal($quote['cents']['total']),
                 'currency' => $quote['currency'],
                 'eta' => $quote['eta'],

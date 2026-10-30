@@ -67,6 +67,7 @@ final class OrderPresenter
             'promoDiscount' => (float) $order['promo_discount'],
             'promoLabel' => $order['promo_label'],
             'shipping' => (float) $order['shipping'],
+            'shippingVariable' => (bool) ($order['shipping_variable'] ?? false),
             'total' => (float) $order['total'],
             'currency' => $order['currency'],
             'coupon' => $order['coupon_code'] === null

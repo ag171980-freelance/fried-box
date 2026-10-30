@@ -54,8 +54,13 @@ final class AdminRepository
             'closedMessage' => $row['closed_message'],
             'acceptsDelivery' => (bool) $row['accepts_delivery'],
             'acceptsPickup' => (bool) $row['accepts_pickup'],
+            // El monto y su interruptor viajan por separado a propósito:
+            // el panel se queda con lo que el local escribió aunque lo
+            // tenga apagado, así no hay que volver a tipearlo.
             'deliveryFee' => (float) $row['delivery_fee'],
+            'deliveryFeeVariable' => (bool) $row['delivery_fee_variable'],
             'minOrder' => (float) $row['min_order'],
+            'minOrderEnabled' => (bool) $row['min_order_enabled'],
             'etaDeliveryMin' => (int) $row['eta_delivery_min'],
             'etaDeliveryMax' => (int) $row['eta_delivery_max'],
             'etaPickupMin' => (int) $row['eta_pickup_min'],
@@ -79,7 +84,8 @@ final class AdminRepository
                 address = :dir, phone = :tel, whatsapp = :wa, hours_text = :hs,
                 is_open = :abierto, closed_message = :msg,
                 accepts_delivery = :envio, accepts_pickup = :retiro,
-                delivery_fee = :costo, min_order = :minimo,
+                delivery_fee = :costo, delivery_fee_variable = :costovar,
+                min_order = :minimo, min_order_enabled = :minimoon,
                 eta_delivery_min = :edmin, eta_delivery_max = :edmax,
                 eta_pickup_min = :epmin, eta_pickup_max = :epmax,
                 theme = :tema, layout = :estilo
@@ -94,7 +100,9 @@ final class AdminRepository
             'envio' => $d['acceptsDelivery'] ? 1 : 0,
             'retiro' => $d['acceptsPickup'] ? 1 : 0,
             'costo' => $d['deliveryFee'],
+            'costovar' => $d['deliveryFeeVariable'] ? 1 : 0,
             'minimo' => $d['minOrder'],
+            'minimoon' => $d['minOrderEnabled'] ? 1 : 0,
             'edmin' => $d['etaDeliveryMin'],
             'edmax' => $d['etaDeliveryMax'],
             'epmin' => $d['etaPickupMin'],

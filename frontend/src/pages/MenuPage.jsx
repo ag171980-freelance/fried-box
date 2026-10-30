@@ -6,7 +6,7 @@ import PromoModal, { PromoImage, PromoTag, promoSignature } from '../components/
 import Ticket from '../components/cart/Ticket.jsx'
 import Topbar from '../components/Topbar.jsx'
 import Icon from '../components/ui/Icon.jsx'
-import { money, pluralize } from '../lib/format.js'
+import { money, pluralize, shippingText } from '../lib/format.js'
 import { useQuote } from '../lib/useQuote.js'
 import { useCart } from '../store/CartProvider.jsx'
 import { usePrefs } from '../store/PrefsProvider.jsx'
@@ -127,6 +127,13 @@ export default function MenuPage() {
     setOpenItem(null)
   }
 
+  const esEnvio = cart.mode === 'delivery'
+  const { deliveryFee, minOrder } = menu.restaurant
+
+  // Sin compra mínima no hay nada que anunciar, así que ese lugar de la
+  // línea lo ocupa la dirección en vez de decir «Mínimo: no hay».
+  const hayMinimo = esEnvio && minOrder !== null
+
   return (
     <div className="shell">
       <Topbar onSearch={() => setSearchOpen((v) => !v)} searchOpen={searchOpen} />
@@ -150,20 +157,16 @@ export default function MenuPage() {
         <div>
           <dt>Demora</dt>
           <dd>
-            {cart.mode === 'delivery' ? menu.restaurant.etaDelivery : menu.restaurant.etaPickup}
+            {esEnvio ? menu.restaurant.etaDelivery : menu.restaurant.etaPickup}
           </dd>
         </div>
         <div>
-          <dt>{cart.mode === 'delivery' ? 'Envío' : 'Retiro'}</dt>
-          <dd>
-            {cart.mode === 'delivery' ? money(menu.restaurant.deliveryFee) : 'sin cargo'}
-          </dd>
+          <dt>{esEnvio ? 'Envío' : 'Retiro'}</dt>
+          <dd>{esEnvio ? shippingText(deliveryFee) : 'sin cargo'}</dd>
         </div>
         <div>
-          <dt>{cart.mode === 'delivery' ? 'Mínimo' : 'Dirección'}</dt>
-          <dd>
-            {cart.mode === 'delivery' ? money(menu.restaurant.minOrder) : menu.restaurant.address}
-          </dd>
+          <dt>{hayMinimo ? 'Mínimo' : 'Dirección'}</dt>
+          <dd>{hayMinimo ? money(minOrder) : menu.restaurant.address}</dd>
         </div>
       </dl>
 

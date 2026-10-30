@@ -81,25 +81,47 @@ export default function Local() {
           alCambiar={set('acceptsPickup')}
         />
 
-        <div className="ad-fila-campos">
-          <Numero
-            etiqueta="Costo del envío"
-            valor={f.deliveryFee}
-            alCambiar={set('deliveryFee')}
-            min="0"
-            step="100"
-            sufijo="$"
-          />
-          <Numero
-            etiqueta="Compra mínima para envío"
-            ayuda="Debajo de este monto no se puede pedir a domicilio."
-            valor={f.minOrder}
-            alCambiar={set('minOrder')}
-            min="0"
-            step="100"
-            sufijo="$"
-          />
-        </div>
+        <Interruptor
+          etiqueta="El costo del envío es variable"
+          ayuda="Para cuando lo manda Uber o un cadete y el precio lo pone otro. El cliente lee «a cotizar», el envío no entra en el total y se lo cobrás aparte."
+          valor={f.deliveryFeeVariable}
+          alCambiar={set('deliveryFeeVariable')}
+        />
+        <Interruptor
+          etiqueta="Pido una compra mínima para el envío"
+          ayuda="Apagado, se puede pedir a domicilio por cualquier monto."
+          valor={f.minOrderEnabled}
+          alCambiar={set('minOrderEnabled')}
+        />
+
+        {/* Cada monto aparece sólo si se usa. Con los dos apagados no
+            queda una fila vacía abriendo un hueco en el bloque. */}
+        {(!f.deliveryFeeVariable || f.minOrderEnabled) && (
+          <div className="ad-fila-campos">
+            {!f.deliveryFeeVariable && (
+              <Numero
+                etiqueta="Costo del envío"
+                ayuda="En 0 el cliente lee «sin cargo»."
+                valor={f.deliveryFee}
+                alCambiar={set('deliveryFee')}
+                min="0"
+                step="100"
+                sufijo="$"
+              />
+            )}
+            {f.minOrderEnabled && (
+              <Numero
+                etiqueta="Compra mínima para envío"
+                ayuda="Debajo de este monto no se puede pedir a domicilio."
+                valor={f.minOrder}
+                alCambiar={set('minOrder')}
+                min="0"
+                step="100"
+                sufijo="$"
+              />
+            )}
+          </div>
+        )}
 
         <div className="ad-fila-campos">
           <Numero

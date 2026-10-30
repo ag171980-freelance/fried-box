@@ -64,12 +64,14 @@ export default function CartPage() {
             <button
               type="button"
               className="tline__drop"
+              title="Sacar el descuento"
+              aria-label="Sacar el descuento"
               onClick={() => {
                 cart.setCoupon('')
                 setDraftCoupon('')
               }}
             >
-              Sacar
+              <Icon name="trash" size={16} />
             </button>
           </div>
         ) : (

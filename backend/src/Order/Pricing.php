@@ -125,10 +125,28 @@ final class Pricing
         }
 
         /* --- envío, cupón y total ------------------------------------ */
-        $shippingCents = $mode === 'delivery' ? Money::toCents($settings['delivery_fee']) : 0;
-        $minOrderCents = Money::toCents($settings['min_order']);
+
+        // El envío puede estar a cotizar: lo manda un tercero y el precio
+        // todavía no se sabe. Entonces no se suma nada, porque inventar
+        // un número sería peor, y se avisa para que el ticket diga «a
+        // cotizar» en vez de «sin cargo», que querría decir gratis.
+        $shippingVariable = $mode === 'delivery' && (bool) ($settings['delivery_fee_variable'] ?? false);
+        $shippingCents = $mode === 'delivery' && !$shippingVariable
+            ? Money::toCents($settings['delivery_fee'])
+            : 0;
+
+        $hayMinimo = (bool) ($settings['min_order_enabled'] ?? true);
+        $minOrderCents = $hayMinimo ? Money::toCents($settings['min_order']) : 0;
 
         [$coupon, $couponError] = $this->coupon($tenantId, $couponCode, $subtotalCents);
+
+        // Un cupón de envío gratis sobre un envío que todavía no tiene
+        // precio no descuenta nada, y dejarlo puesto diría «Envío sin
+        // cargo» arriba de un «a cotizar». Se rechaza con el motivo.
+        if ($coupon !== null && $coupon['type'] === 'shipping' && $shippingVariable) {
+            $coupon = null;
+            $couponError = 'El envío de este pedido se cotiza aparte, así que ese código no se puede aplicar.';
+        }
 
         // El cupón va sobre lo que queda después de la promo: un 10% de
         // cupón encima de un 10% de promo no descuenta un 20% del total.
@@ -147,7 +165,7 @@ final class Pricing
         }
 
         $totalCents = max(0, $subtotalCents - $promoCents - $discountCents + $shippingCents);
-        $belowMinimum = $mode === 'delivery' && $subtotalCents < $minOrderCents;
+        $belowMinimum = $hayMinimo && $mode === 'delivery' && $subtotalCents < $minOrderCents;
 
         return [
             'lines' => $priced,
@@ -156,6 +174,7 @@ final class Pricing
             'promoDiscount' => Money::fromCents($promoCents),
             'promoLabel' => $promosAplicadas === [] ? null : implode(' · ', $promosAplicadas),
             'shipping' => Money::fromCents($shippingCents),
+            'shippingVariable' => $shippingVariable,
             'total' => Money::fromCents($totalCents),
             'currency' => $settings['currency'],
             'coupon' => $coupon === null ? null : [
@@ -166,7 +185,7 @@ final class Pricing
             'couponId' => $coupon === null ? null : (int) $coupon['id'],
             'couponError' => $couponError,
             'belowMinimum' => $belowMinimum,
-            'minOrder' => Money::fromCents($minOrderCents),
+            'minOrder' => $hayMinimo ? Money::fromCents($minOrderCents) : null,
             'eta' => $mode === 'delivery'
                 ? sprintf('%d a %d min', (int) $settings['eta_delivery_min'], (int) $settings['eta_delivery_max'])
                 : sprintf('%d a %d min', (int) $settings['eta_pickup_min'], (int) $settings['eta_pickup_max']),

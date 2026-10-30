@@ -4,7 +4,7 @@ import { Steps } from './CartPage.jsx'
 import Ticket from '../components/cart/Ticket.jsx'
 import { StepBar } from '../components/Topbar.jsx'
 import Icon from '../components/ui/Icon.jsx'
-import { money } from '../lib/format.js'
+import { money, shippingText } from '../lib/format.js'
 import { useQuote } from '../lib/useQuote.js'
 import { createOrder } from '../api/index.js'
 import { useCart } from '../store/CartProvider.jsx'
@@ -120,9 +120,12 @@ export default function CheckoutPage() {
                 <span className="pickcard__name">
                   <Icon name="bike" size={18} /> Envío a domicilio
                 </span>
-                <span className="pickcard__desc">Llega en {restaurant.etaDelivery}.</span>
+                <span className="pickcard__desc">
+                  Llega en {restaurant.etaDelivery}.
+                  {restaurant.deliveryFee === null && ' El envío se cobra aparte.'}
+                </span>
               </span>
-              <span className="pickcard__side">{money(restaurant.deliveryFee)}</span>
+              <span className="pickcard__side">{shippingText(restaurant.deliveryFee)}</span>
             </label>
           )}
           {restaurant.acceptsPickup && (

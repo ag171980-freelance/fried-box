@@ -118,16 +118,23 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+/* El tacho de sacar. Antes era la palabra «Sacar» subrayada, que al
+   lado del más y el menos competía con ellos por ser lo único escrito.
+   El redondel al pasar el mouse es el mismo gesto que ya hacen esos
+   dos botones, pero en rojo porque esto no se deshace. */
 .tline__drop {
-  font-family: var(--font-mono);
-  font-size: var(--t-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-full);
   color: var(--ink-3);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
-.tline__drop:hover { color: var(--danger); }
+.tline__drop:hover,
+.tline__drop:focus-visible {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
 
 .ticket__sums {
   display: flex;
@@ -143,6 +150,13 @@
 }
 .tsum--muted { color: var(--ink-2); }
 .tsum--save { color: var(--ok); }
+/* La aclaración del envío a cotizar: un renglón solo, no un par de
+   etiqueta y monto como las demás líneas de la suma. */
+.tsum--nota {
+  display: block;
+  font-size: var(--t-xs);
+  line-height: 1.4;
+}
 .tsum--total {
   margin-top: var(--s2);
   padding-top: var(--s3);
