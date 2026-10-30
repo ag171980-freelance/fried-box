@@ -4,8 +4,8 @@
 # dominio de Netlify, así que no hace falta CORS y las fotos que sube el
 # panel se piden igual que en desarrollo con Vite.
 #
-# Reemplazar API_HOST por el dominio del Apache (con https), apuntando a
-# la carpeta que sirve backend/public/.
+# La API vive en https://colibripremium.store/appi/public (la carpeta
+# backend/ subida a /appi; sólo public/ se sirve por web).
 
 [build]
   base = "frontend"
@@ -18,13 +18,13 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://API_HOST/:splat"
+  to = "https://colibripremium.store/appi/public/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/uploads/*"
-  to = "https://API_HOST/uploads/:splat"
+  to = "https://colibripremium.store/appi/public/uploads/:splat"
   status = 200
   force = true
 
